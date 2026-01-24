@@ -1,1 +1,1 @@
-"""Vaak test suite."""
+"""Rough test suite."""

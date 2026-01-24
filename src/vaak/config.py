@@ -1,10 +1,10 @@
-"""Vaak Configuration - Pydantic Settings.
+"""Rough Configuration - Pydantic Settings.
 
 This module handles environment-based configuration using Pydantic Settings.
 All configuration is validated at startup and immutable thereafter.
 
 Usage:
-    from vaak.config import settings
+    from rough.config import settings
     print(settings.secret_key)
 """
 
@@ -17,25 +17,25 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class VaakSettings(BaseSettings):
+class StrictSettings(BaseSettings):
     """Application settings loaded from environment variables.
 
     All settings are validated at instantiation time.
-    Uses the VAAK_ prefix for all environment variables.
+    Uses the STRICT_ prefix for all environment variables.
 
     Environment Variables:
-        VAAK_SECRET_KEY: Secret key for cryptographic operations
-        VAAK_DEBUG: Enable debug mode (default: False)
-        VAAK_LOG_LEVEL: Logging level (default: INFO)
-        VAAK_MAX_RETRIES: Maximum retry attempts (default: 3)
-        VAAK_TIMEOUT_SECONDS: Default timeout in seconds (default: 30.0)
-        VAAK_CLOUD_ENDPOINT: Cloud processor endpoint URL
-        VAAK_LOCAL_MODEL_PATH: Path to local model files
-        VAAK_TOKEN_THRESHOLD: Threshold for processor routing (default: 500)
+        STRICT_SECRET_KEY: Secret key for cryptographic operations
+        STRICT_DEBUG: Enable debug mode (default: False)
+        STRICT_LOG_LEVEL: Logging level (default: INFO)
+        STRICT_MAX_RETRIES: Maximum retry attempts (default: 3)
+        STRICT_TIMEOUT_SECONDS: Default timeout in seconds (default: 30.0)
+        STRICT_CLOUD_ENDPOINT: Cloud processor endpoint URL
+        STRICT_LOCAL_MODEL_PATH: Path to local model files
+        STRICT_TOKEN_THRESHOLD: Threshold for processor routing (default: 500)
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="VAAK_",
+        env_prefix="STRICT_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
@@ -99,16 +99,16 @@ class VaakSettings(BaseSettings):
 
 
 @lru_cache
-def get_settings() -> VaakSettings:
+def get_settings() -> StrictSettings:
     """Get cached application settings.
 
     Settings are loaded once and cached for subsequent calls.
     This ensures configuration is consistent throughout the application.
 
     Returns:
-        VaakSettings instance with validated configuration.
+        StrictSettings instance with validated configuration.
     """
-    return VaakSettings()
+    return StrictSettings()
 
 
 # Convenience export for direct import

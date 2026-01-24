@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from pydantic import BaseModel, ValidationError
 
 if TYPE_CHECKING:
-    from vaak.integrity.schemas import FailoverConfig, ProcessingRequest
+    from rough.integrity.schemas import FailoverConfig, ProcessingRequest
 
 
 # Type variable for generic model validation
@@ -55,7 +55,7 @@ def validate_model_output(
         If validation fails, validated_model is None.
 
     Example:
-        >>> from vaak.integrity.schemas import SignalConfig
+        >>> from rough.integrity.schemas import SignalConfig
         >>> result, errors = validate_model_output(
         ...     {"signal_type": "analog", "sampling_rate": 44100.0, ...},
         ...     SignalConfig

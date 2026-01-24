@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vaak"
+name = "rough"
 version = "0.1.0"
 description = "High-Integrity Signal Processing Engine with Diamond Gate Protocol"
 readme = "README.md"
@@ -46,13 +46,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mohitmishra786/vaak"
-Documentation = "https://github.com/mohitmishra786/vaak/tree/main/docs"
-Repository = "https://github.com/mohitmishra786/vaak"
-Issues = "https://github.com/mohitmishra786/vaak/issues"
+Homepage = "https://github.com/mohitmishra786/rough"
+Documentation = "https://github.com/mohitmishra786/rough/tree/main/docs"
+Repository = "https://github.com/mohitmishra786/rough"
+Issues = "https://github.com/mohitmishra786/rough/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vaak"]
+packages = ["src/rough"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -98,10 +98,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["vaak"]
+known-first-party = ["rough"]
 
 [tool.coverage.run]
-source = ["src/vaak"]
+source = ["src/rough"]
 branch = true
 
 [tool.coverage.report]

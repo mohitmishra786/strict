@@ -1,6 +1,6 @@
 # Mathematical Foundations
 
-This document provides the mathematical proofs and derivations for the core formulas implemented in Vaak.
+This document provides the mathematical proofs and derivations for the core formulas implemented in Rough.
 
 ---
 
@@ -112,7 +112,7 @@ $$
 
 ### Implementation Constraint
 
-In Vaak, we enforce:
+In Rough, we enforce:
 
 $$
 f_s > 2 \cdot f_{\text{signal}}

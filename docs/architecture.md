@@ -1,8 +1,8 @@
-# Vaak Architecture
+# Rough Architecture
 
 ## Overview
 
-Vaak implements a **Diamond Gate Protocol** - a strict four-layer architecture designed around the principle of **"Correctness by Construction"**. The core philosophy is **"Parse, Don't Validate"**: we do not check data after ingestion; we parse it into strictly typed structures at the very edge. If data cannot form a valid Model, it is rejected immediately.
+Rough implements a **Diamond Gate Protocol** - a strict four-layer architecture designed around the principle of **"Correctness by Construction"**. The core philosophy is **"Parse, Don't Validate"**: we do not check data after ingestion; we parse it into strictly typed structures at the very edge. If data cannot form a valid Model, it is rejected immediately.
 
 **No invalid state is ever representable in the Core layer.**
 
@@ -116,7 +116,7 @@ flowchart TD
 ## Module Structure
 
 ```
-src/vaak/
+src/rough/
     __init__.py
     config.py              # Pydantic Settings (Environment)
     

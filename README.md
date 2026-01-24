@@ -1,8 +1,8 @@
-# Vaak
+# Rough
 
 > Sanskrit for "Speech/Voice" - A High-Integrity Signal Processing Engine
 
-Vaak implements the **Diamond Gate Protocol**, a strict four-layer architecture designed around the principle of **"Correctness by Construction"**.
+Rough implements the **Diamond Gate Protocol**, a strict four-layer architecture designed around the principle of **"Correctness by Construction"**.
 
 ---
 
@@ -37,11 +37,11 @@ See [docs/architecture.md](docs/architecture.md) for detailed documentation with
 
 ```bash
 # Clone the repository
-git clone https://github.com/mohitmishra786/vaak.git
-cd vaak
+git clone https://github.com/mohitmishra786/rough.git
+cd rough
 
 # Create virtual environment (named bhasha)
-python -m venv bhasha
+python3.11 -m venv bhasha
 source bhasha/bin/activate
 
 # Install
@@ -53,8 +53,8 @@ pip install -e .
 ## Quick Start
 
 ```python
-from vaak.integrity import SignalConfig, ProcessingRequest
-from vaak.core import validate_model_output, calculate_system_success_probability
+from rough.integrity import SignalConfig, ProcessingRequest
+from rough.core import validate_model_output, calculate_system_success_probability
 
 # Create a validated signal configuration
 config = SignalConfig(
@@ -80,9 +80,9 @@ print(f"System success probability: {p_success:.4f}")  # 0.9995
 Copy `.env` to `.env.local` and configure:
 
 ```ini
-VAAK_SECRET_KEY=your-secret-key
-VAAK_DEBUG=false
-VAAK_LOG_LEVEL=INFO
+STRICT_SECRET_KEY=your-secret-key
+STRICT_DEBUG=false
+STRICT_LOG_LEVEL=INFO
 ```
 
 See [docs/setup_guide.md](docs/setup_guide.md) for full configuration options.
@@ -104,7 +104,7 @@ See [docs/setup_guide.md](docs/setup_guide.md) for full configuration options.
 pytest tests/ -v
 
 # Type checking
-mypy src/vaak/
+mypy src/rough/
 
 # Linting
 ruff check src/ tests/
