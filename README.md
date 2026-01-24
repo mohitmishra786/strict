@@ -1,8 +1,6 @@
-# Rough
+# Strict
 
-> Sanskrit for "Speech/Voice" - A High-Integrity Signal Processing Engine
-
-Rough implements the **Diamond Gate Protocol**, a strict four-layer architecture designed around the principle of **"Correctness by Construction"**.
+Strict implements the **Diamond Gate Protocol**, a strict four-layer architecture designed around the principle of **"Correctness by Construction"**.
 
 ---
 
