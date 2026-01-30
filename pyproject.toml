@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "rough"
+name = "strict"
 version = "0.1.0"
 description = "High-Integrity Signal Processing Engine with Diamond Gate Protocol"
 readme = "README.md"
@@ -52,7 +52,7 @@ Repository = "https://github.com/mohitmishra786/rough"
 Issues = "https://github.com/mohitmishra786/rough/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/rough"]
+packages = ["src/strict"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -98,10 +98,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["rough"]
+known-first-party = ["strict"]
 
 [tool.coverage.run]
-source = ["src/rough"]
+source = ["src/strict"]
 branch = true
 
 [tool.coverage.report]

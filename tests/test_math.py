@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from rough.core.math_engine import (
+from strict.core.math_engine import (
     calculate_availability,
     calculate_combined_availability,
     calculate_nyquist_frequency,
@@ -26,7 +26,7 @@ from rough.core.math_engine import (
     validate_model_output,
     validate_with_retry,
 )
-from rough.integrity.schemas import FailoverConfig
+from strict.integrity.schemas import FailoverConfig
 
 
 class TestValidateModelOutput:

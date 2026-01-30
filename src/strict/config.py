@@ -4,7 +4,7 @@ This module handles environment-based configuration using Pydantic Settings.
 All configuration is validated at startup and immutable thereafter.
 
 Usage:
-    from rough.config import settings
+    from strict.config import settings
     print(settings.secret_key)
 """
 

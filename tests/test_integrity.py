@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from rough.integrity.schemas import (
+from strict.integrity.schemas import (
     FailoverConfig,
     OutputSchema,
     ProcessingRequest,
@@ -25,7 +25,7 @@ from rough.integrity.schemas import (
     ValidationResult,
     ValidationStatus,
 )
-from rough.integrity.validators import (
+from strict.integrity.validators import (
     collect_validation_errors,
     compute_input_hash,
     create_validation_summary,
