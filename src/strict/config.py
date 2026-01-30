@@ -47,6 +47,14 @@ class StrictSettings(BaseSettings):
         default=SecretStr(""),
         description="Secret key for cryptographic operations. User to fill.",
     )
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        description="OpenAI API Key",
+    )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        description="Ollama Base URL",
+    )
 
     # Runtime Configuration
     debug: bool = Field(

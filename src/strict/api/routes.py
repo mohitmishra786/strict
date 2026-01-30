@@ -3,8 +3,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import ValidationError
 
-from strict.core.math_engine import route_request
 from strict.integrity.schemas import ValidationResult
+from strict.processors.manager import ProcessorManager
 from strict.api.schemas import (
     ProcessingRequestDTO,
     SignalConfigDTO,
@@ -13,6 +13,7 @@ from strict.api.schemas import (
 )
 
 router = APIRouter()
+processor_manager = ProcessorManager()
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -61,15 +62,10 @@ async def process_request(dto: ProcessingRequestDTO) -> dict[str, Any]:
         # Convert DTO to strict domain model
         request = dto.to_domain()
 
-        # Determine processor
-        processor = route_request(request)
+        # Process using manager (calls actual LLMs)
+        output = await processor_manager.process_request(request)
 
-        return {
-            "status": "processed",
-            "processor_used": processor,
-            "input_tokens": request.input_tokens,
-            "note": "Actual LLM integration pending (Issue #4)",
-        }
+        return output.model_dump()
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
