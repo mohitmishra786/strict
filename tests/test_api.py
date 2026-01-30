@@ -18,6 +18,13 @@ def test_health_check():
     assert response.json() == {"status": "ok", "version": "0.1.0"}
 
 
+def test_metrics_endpoint():
+    """Test that Prometheus metrics endpoint is exposed."""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "strict_api_requests_total" in response.text or "# HELP" in response.text
+
+
 def test_validate_signal_valid():
     """Test validating a valid signal config."""
     valid_data = {

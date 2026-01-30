@@ -6,14 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from strict.api.routes import router
 from strict.config import settings
+from strict.observability.logging import configure_logging
+from strict.observability.metrics import configure_metrics
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan events for the FastAPI application."""
-    # Startup logic (e.g., connect to DB, load models)
+    configure_logging()
     yield
-    # Shutdown logic (e.g., disconnect DB)
 
 
 def create_app() -> FastAPI:
@@ -26,16 +27,16 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
 
-    # Configure CORS
+    configure_metrics(app)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # In production, this should be configured via settings
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # Include routes
     app.include_router(router)
 
     return app

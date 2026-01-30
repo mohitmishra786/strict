@@ -38,6 +38,8 @@ dependencies = [
     "uvicorn>=0.20.0",
     "httpx>=0.24.0",
     "openai>=1.0.0",
+    "structlog>=23.1.0",
+    "prometheus-fastapi-instrumentator>=6.0.0",
 ]
 
 [project.optional-dependencies]
