@@ -82,6 +82,20 @@ class StrictSettings(BaseSettings):
         description="S3 Bucket Name",
     )
 
+    # Auth Configuration
+    auth_secret_key: SecretStr = Field(
+        default=SecretStr("changeme"),
+        description="Secret key for JWT",
+    )
+    auth_algorithm: str = Field(
+        default="HS256",
+        description="JWT Algorithm",
+    )
+    auth_access_token_expire_minutes: int = Field(
+        default=30,
+        description="Token expiration time",
+    )
+
     # Runtime Configuration
     debug: bool = Field(
         default=False,

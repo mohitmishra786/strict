@@ -44,6 +44,9 @@ dependencies = [
     "asyncpg>=0.29.0",
     "redis>=5.0.0",
     "aioboto3>=12.0.0",
+    "python-jose>=3.3.0",
+    "passlib[bcrypt]>=1.7.0",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
