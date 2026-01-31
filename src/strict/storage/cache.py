@@ -15,7 +15,7 @@ class CacheManager:
     async def get(self, key: str) -> Any | None:
         """Get value from cache."""
         value = await self.redis.get(key)
-        if value:
+        if value is not None:
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
@@ -23,9 +23,9 @@ class CacheManager:
         return None
 
     async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
-        """Set value in cache."""
-        if not isinstance(value, (str, int, float, bool)):
-            value = json.dumps(value)
+        """Set value in cache with consistent JSON serialization."""
+        # Always JSON-encode for consistency
+        value = json.dumps(value)
         await self.redis.set(key, value, ex=ttl)
 
     async def close(self):
@@ -33,4 +33,13 @@ class CacheManager:
         await self.redis.close()
 
 
-cache = CacheManager()
+# Lazy initialization
+_cache: CacheManager | None = None
+
+
+def get_cache() -> CacheManager:
+    """Get or create the cache manager singleton."""
+    global _cache
+    if _cache is None:
+        _cache = CacheManager()
+    return _cache

@@ -1,10 +1,16 @@
 import time
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIError
 from strict.config import settings
 from strict.core.interfaces import AsyncProcessor
-from strict.integrity.schemas import ProcessingRequest, OutputSchema, ProcessorType
+from strict.integrity.schemas import (
+    ProcessingRequest,
+    OutputSchema,
+    ProcessorType,
+    ValidationResult,
+    ValidationStatus,
+)
 from strict.processors.base import BaseProcessor
 
 
@@ -31,16 +37,30 @@ class OpenAIProcessor(BaseProcessor):
         ]
 
         try:
-            response = await self.client.chat.completions.create(
+            # Use client with timeout from request
+            client_with_timeout = self.client.with_options(
+                timeout=request.timeout_seconds
+            )
+            response = await client_with_timeout.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                # In production, we might want to limit tokens based on request
             )
             result = response.choices[0].message.content or ""
-        except Exception as e:
-            # For now, return error as result, or raise exception to be handled by caller
-            # Ideally we return a failed ValidationResult
-            result = f"Error calling OpenAI: {str(e)}"
-            # In a robust system we would handle retry logic here or in base class
+        except APIError as e:
+            # Return failed ValidationResult for API errors
+            duration = (time.time() - start_time) * 1000
+            return OutputSchema(
+                result="",
+                validation=ValidationResult(
+                    status=ValidationStatus.FAILURE,
+                    is_valid=False,
+                    input_hash="hash_placeholder",
+                    errors=(f"OpenAI API error: {str(e)}",),
+                    warnings=(),
+                ),
+                processor_used=ProcessorType.CLOUD,
+                processing_time_ms=duration,
+                retries_attempted=0,
+            )
 
         return await self._create_output(result, ProcessorType.CLOUD, start_time)
