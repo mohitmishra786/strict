@@ -4,10 +4,11 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from strict.api.routes import router
+from strict.api.routes import router as api_router
 from strict.config import settings
 from strict.observability.logging import configure_logging
 from strict.observability.metrics import configure_metrics
+from strict.dashboard.routes import router as dashboard_router
 
 
 @asynccontextmanager
@@ -37,7 +38,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(router)
+    app.include_router(api_router)
+    app.include_router(dashboard_router)
 
     return app
 
