@@ -70,7 +70,7 @@ def validate(
             rprint(f"[red]✗[/red] Unsupported format: {format_type}")
             raise typer.Exit(1)
 
-        result = signal_data.validate()
+        result = signal_data.validate_integrity()
         if result.is_valid:
             rprint("[green]✓[/green] Signal data is valid")
             rprint(f"  Samples: {len(signal_data.values)}")
@@ -141,15 +141,17 @@ def fft(
         table.add_column("Value", style="green")
 
         table.add_row("Input Samples", str(len(signal_data.values)))
-        table.add_row("Output Samples", str(len(result.values)))
-        table.add_row("Sample Rate", f"{signal_data.sample_rate} Hz")
+        table.add_row("Output Bins", str(len(result.magnitudes)))
+        table.add_row("Nyquist Frequency", f"{result.nyquist_frequency} Hz")
 
         console.print(table)
 
-        if len(result.values) <= 20:
-            rprint("\n[bold]FFT Values:[/bold]")
-            for i, val in enumerate(result.values[:10]):
-                rprint(f"  {i}: {val:.6f}")
+        if len(result.magnitudes) <= 20:
+            rprint("\n[bold]FFT Magnitudes:[/bold]")
+            for i, val in enumerate(result.magnitudes[:10]):
+                freq_val = result.frequencies[i]
+                mag_val = result.magnitudes[i]
+                rprint(f"  {freq_val:.2f} Hz: {mag_val:.6f}")
 
     except Exception as e:
         rprint(f"[red]✗[/red] FFT error: {e}")

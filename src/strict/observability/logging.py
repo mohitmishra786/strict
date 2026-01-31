@@ -1,6 +1,7 @@
 import structlog
 import logging
 import sys
+from typing import Any
 from strict.config import settings
 
 
@@ -41,3 +42,8 @@ def configure_logging():
 
 
 logger = structlog.get_logger()
+
+
+def get_logger(name: str | None = None) -> Any:
+    """Get a structured logger."""
+    return structlog.get_logger(name)

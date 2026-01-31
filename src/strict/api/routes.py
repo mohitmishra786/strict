@@ -1,12 +1,22 @@
+from __future__ import annotations
 from typing import Annotated, Any
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    status,
+    Depends,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import ValidationError
 
-from strict.integrity.schemas import ValidationResult
+from strict.integrity.schemas import ValidationResult, ProcessingRequest
 from strict.processors.manager import ProcessorManager
+from strict.api.ws import manager
+
 from strict.api.schemas import (
     ProcessingRequestDTO,
     SignalConfigDTO,
@@ -18,13 +28,17 @@ from strict.api.security import (
     create_access_token,
     get_current_user_or_apikey,
     verify_password,
+    validate_token,
+    validate_api_key,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     TokenData,
 )
 from strict.config import get_settings
+from strict.observability.logging import get_logger
 
 router = APIRouter()
 processor_manager = ProcessorManager()
+logger = get_logger(__name__)
 
 
 @router.post("/token", response_model=Token)
@@ -115,3 +129,71 @@ async def process_request(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         ) from e
+
+
+@router.websocket("/ws/stream")
+async def websocket_stream(websocket: WebSocket):
+    """WebSocket for real-time streaming processing."""
+    # Authenticate before accepting
+    auth_success = False
+
+    # 1. Check API Key in headers
+    api_key = websocket.headers.get("x-api-key")
+    if api_key:
+        user = await validate_api_key(api_key)
+        if user:
+            auth_success = True
+
+    # 2. Check Bearer token in headers
+    if not auth_success:
+        auth_header = websocket.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token = auth_header[7:]
+            user = await validate_token(token)
+            if user:
+                auth_success = True
+
+    # 3. Fallback to query parameters
+    if not auth_success:
+        api_key = websocket.query_params.get("api_key")
+        if api_key:
+            user = await validate_api_key(api_key)
+            if user:
+                auth_success = True
+
+    if not auth_success:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Receive processing request as JSON
+            data = await websocket.receive_json()
+
+            try:
+                # Basic validation using DTO (simplified for WS)
+                dto = ProcessingRequestDTO(**data)
+                request = dto.to_domain()
+
+                # Get appropriate processor
+                processor = processor_manager.get_processor(request)
+
+                # Stream results back
+                async for chunk in processor.stream_process(request):
+                    await websocket.send_json({"type": "chunk", "content": chunk})
+
+                await websocket.send_json({"type": "done", "content": ""})
+
+            except ValidationError as e:
+                await websocket.send_json({"type": "error", "content": str(e)})
+            except Exception:
+                logger.exception("Error processing WebSocket request", exc_info=True)
+                await websocket.send_json(
+                    {"type": "error", "content": "Internal server error"}
+                )
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+    finally:
+        manager.disconnect(websocket)

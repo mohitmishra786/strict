@@ -16,7 +16,7 @@ Formulas Implemented:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Callable
 
 from pydantic import BaseModel, ValidationError
 
@@ -77,7 +77,7 @@ def validate_with_retry(
     raw_input: dict[str, Any],
     schema: type[T],
     max_retries: int = 3,
-    transform_fn: callable | None = None,
+    transform_fn: Callable[[dict[str, Any], list[str]], dict[str, Any]] | None = None,
 ) -> tuple[T | None, list[str], int]:
     """Validate with optional transformation and retry logic.
 
@@ -235,7 +235,9 @@ def calculate_nyquist_frequency(sampling_rate: float) -> float:
     return sampling_rate / 2.0
 
 
-def calculate_required_sampling_rate(max_frequency: float, margin: float = 1.1) -> float:
+def calculate_required_sampling_rate(
+    max_frequency: float, margin: float = 1.1
+) -> float:
     """Calculate the minimum required sampling rate for a signal.
 
     Applies the Nyquist criterion with an optional safety margin.
@@ -314,7 +316,7 @@ def calculate_combined_availability(
         # Parallel: system fails only if ALL components fail
         failure_prob = 1.0
         for a in availabilities:
-            failure_prob *= (1.0 - a)
+            failure_prob *= 1.0 - a
         return 1.0 - failure_prob
     else:
         # Series: system fails if ANY component fails

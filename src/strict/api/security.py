@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -52,60 +53,71 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_user(
-    token: Optional[str] = Depends(oauth2_scheme),
-) -> Optional[TokenData]:
-    """Get current user from OAuth2 token.
-
-    Returns TokenData if token is valid, None otherwise.
-    """
-    if token is None:
-        return None
-
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def validate_token(token: str) -> Optional[TokenData]:
+    """Validate a JWT token and return TokenData."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: Optional[str] = payload.get("sub")
         if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError as e:
-        raise credentials_exception from e
-    return token_data
+            return None
+        return TokenData(username=username)
+    except JWTError:
+        return None
+
+
+async def validate_api_key(api_key: str) -> Optional[TokenData]:
+    """Validate an API key and return TokenData."""
+    for key in settings.valid_api_keys:
+        if secrets.compare_digest(api_key, key.get_secret_value()):
+            return TokenData(username="api_key_user")
+    return None
+
+
+async def get_current_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> Optional[TokenData]:
+    """Get current user from OAuth2 token."""
+    if token is None:
+        return None
+
+    user = await validate_token(token)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 
 async def verify_api_key(
     api_key: Optional[str] = Depends(api_key_header),
 ) -> Optional[TokenData]:
-    """Verify API Key against configured valid keys.
-
-    Returns TokenData if API key is valid, None otherwise.
-    """
+    """Verify API Key against configured valid keys."""
     if not api_key:
         return None
 
-    # Check against configured valid API keys
-    valid_keys = [key.get_secret_value() for key in settings.valid_api_keys]
-    if api_key in valid_keys:
-        return TokenData(username="api_key_user")
-
-    # Don't raise here - just return None to allow other auth methods
-    return None
+    return await validate_api_key(api_key)
 
 
 async def get_current_user_or_apikey(
-    token_user: Optional[TokenData] = Depends(get_current_user),
+    token: Optional[str] = Depends(oauth2_scheme),
     api_key_user: Optional[TokenData] = Depends(verify_api_key),
 ) -> TokenData:
     """Allow either OAuth2 or API Key authentication."""
     if api_key_user:
         return api_key_user
-    if token_user:
-        return token_user
+
+    if token:
+        user = await validate_token(token)
+        if user:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",

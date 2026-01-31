@@ -100,9 +100,178 @@ class ValidationStatus(str, Enum):
     PARTIAL = "partial"
 
 
+class Region(str, Enum):
+    """Supported deployment regions."""
+
+    US_EAST = "us-east-1"
+    US_WEST = "us-west-2"
+    EU_CENTRAL = "eu-central-1"
+    AP_SOUTHEAST = "ap-southeast-1"
+
+
+class RegionConfig(BaseModel):
+    """Configuration for a specific region."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    region: Region
+    endpoint: str
+    latency_ms: float = Field(default=0.0, ge=0.0)
+    is_active: bool = True
+
+
+class GeoRoutingConfig(BaseModel):
+    """Configuration for multi-region geo-routing."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    regions: tuple[RegionConfig, ...]
+    primary_region: Region
+    failover_enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_primary_region(self) -> GeoRoutingConfig:
+        """Ensure primary_region is in the regions list."""
+        region_values = {r.region for r in self.regions}
+        if self.primary_region not in region_values:
+            raise ValueError(
+                f"primary_region '{self.primary_region}' not found in regions list"
+            )
+        return self
+
+
+class FeatureType(str, Enum):
+    """Type of feature in an ML model."""
+
+    NUMERIC = "numeric"
+    CATEGORICAL = "categorical"
+    BOOLEAN = "boolean"
+    TEXT = "text"
+
+
 # -----------------------------------------------------------------------------
 # Immutable Models
 # -----------------------------------------------------------------------------
+
+
+class FeatureSchema(BaseModel):
+    """Schema for an ML model feature."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    feature_type: FeatureType
+    description: str | None = None
+    required: bool = True
+    min_value: float | None = None
+    max_value: float | None = None
+    allowed_values: tuple[Any, ...] | None = None
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> FeatureSchema:
+        """Ensure min_value <= max_value for numeric features."""
+        if self.feature_type == FeatureType.NUMERIC:
+            if self.min_value is not None and self.max_value is not None:
+                if self.min_value > self.max_value:
+                    raise ValueError(
+                        f"min_value ({self.min_value}) must be <= max_value ({self.max_value})"
+                    )
+        return self
+
+
+class MLModelConfig(BaseModel):
+    """Configuration for an ML model."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
+    features: tuple[FeatureSchema, ...]
+    performance_threshold: Probability = Field(default=0.8)
+    current_performance: Probability | None = None
+    last_evaluated: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MLModelValidationRequest(BaseModel):
+    """Request for ML model input validation."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    model_info: MLModelConfig
+    input_features: dict[str, Any]
+
+    def validate_inputs(self) -> ValidationResult:
+        """Validate input features against the model schema.
+
+        Returns:
+            ValidationResult with any errors found.
+        """
+        from strict.integrity.validators import (
+            validate_feature_value,
+            compute_input_hash,
+        )
+        import json
+
+        errors = []
+        validated_features = {}
+        # Check if all required features are present
+        schema_features = {f.name: f for f in self.model_info.features}
+
+        # Check for missing required features
+        for name, schema in schema_features.items():
+            if schema.required and name not in self.input_features:
+                errors.append(f"Missing required feature: {name}")
+
+        # Validate provided features
+        for name, value in self.input_features.items():
+            if name not in schema_features:
+                errors.append(f"Unknown feature: {name}")
+                continue
+
+            is_valid, error_msg = validate_feature_value(value, schema_features[name])
+            if not is_valid:
+                errors.append(error_msg)
+            else:
+                validated_features[name] = value
+
+        # Deterministic hashing of only validated, serializable features
+        try:
+            # We use a subset of features that are known to be part of the schema
+            # and passed validation. For extra safety, we handle serialization errors.
+            hash_data = json.dumps(validated_features, sort_keys=True)
+        except (TypeError, ValueError):
+            # Fallback to a deterministic representation if not serializable
+            hash_data = str(sorted(validated_features.items()))
+
+        input_hash = compute_input_hash(hash_data)[:16]
+
+        if errors:
+            return ValidationResult(
+                status=ValidationStatus.FAILURE,
+                is_valid=False,
+                input_hash=input_hash,
+                errors=tuple(errors),
+            )
+
+        return ValidationResult(
+            status=ValidationStatus.SUCCESS,
+            is_valid=True,
+            input_hash=input_hash,
+        )
+
+
+class SpectrumData(BaseModel):
+    """Frequency-domain spectrum data.
+
+    Contains magnitude values and their corresponding frequency bins.
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    magnitudes: list[float] = Field(description="FFT magnitude values")
+    frequencies: list[float] = Field(description="Frequency bins in Hz")
+    nyquist_frequency: PositiveFloat = Field(description="Nyquist frequency in Hz")
 
 
 class SignalData(BaseModel):
@@ -123,7 +292,7 @@ class SignalData(BaseModel):
             raise ValueError("Signal data must contain at least one sample")
         return self
 
-    def validate(self) -> ValidationResult:
+    def validate_integrity(self) -> ValidationResult:
         """Validate the signal data.
 
         Returns:

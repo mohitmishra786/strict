@@ -55,6 +55,10 @@ class StrictSettings(BaseSettings):
         default=None,
         description="OpenAI API Key",
     )
+    groq_api_key: SecretStr | None = Field(
+        default=None,
+        description="Groq API Key",
+    )
     ollama_base_url: str = Field(
         default="http://localhost:11434",
         description="Ollama Base URL",
@@ -169,6 +173,10 @@ class StrictSettings(BaseSettings):
     enable_failover: bool = Field(
         default=True,
         description="Enable automatic failover to local on cloud failure",
+    )
+    allow_dummy_key: bool = Field(
+        default=False,
+        description="Allow dummy API keys for development/testing",
     )
 
     @model_validator(mode="after")
