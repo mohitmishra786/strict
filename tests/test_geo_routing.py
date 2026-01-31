@@ -41,14 +41,17 @@ class TestGeoRouting:
 
         # US_EAST fails over to US_WEST (next active region)
         failover = engine.get_failover_region(Region.US_EAST)
+        assert failover is not None
         assert failover.region == Region.US_WEST
 
         # US_WEST fails over to US_EAST (next active region)
         failover = engine.get_failover_region(Region.US_WEST)
+        assert failover is not None
         assert failover.region == Region.US_EAST
 
         # AP_SOUTHEAST is inactive, so it shouldn't be picked for failover
         failover = engine.get_failover_region(Region.EU_CENTRAL)
+        assert failover is not None
         assert (
             failover.region == Region.US_EAST
         )  # AP_SOUTHEAST is skipped because is_active=False

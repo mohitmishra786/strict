@@ -24,7 +24,10 @@ class GeoRoutingEngine:
         else:
             region_name = Region.US_EAST
 
-        return self.get_region_config(region_name) or self.get_primary_region()
+        config = self.get_region_config(region_name)
+        if config:
+            return config
+        return self.get_primary_region()
 
     def get_region_config(self, region: Region) -> Optional[RegionConfig]:
         """Get configuration for a specific region."""
@@ -35,7 +38,13 @@ class GeoRoutingEngine:
 
     def get_primary_region(self) -> RegionConfig:
         """Get the primary region configuration."""
-        return self.get_region_config(self.config.primary_region)
+        config = self.get_region_config(self.config.primary_region)
+        if not config:
+            # This should not happen if GeoRoutingConfig is valid
+            raise ValueError(
+                f"Primary region {self.config.primary_region} not found in regions list"
+            )
+        return config
 
     def get_failover_region(self, current_region: Region) -> Optional[RegionConfig]:
         """Determine the next region to failover to."""
