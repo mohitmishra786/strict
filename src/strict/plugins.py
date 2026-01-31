@@ -190,6 +190,10 @@ class PluginManager:
             module = importlib.import_module(module_path)
             plugin_class = getattr(module, class_name)
 
+            if not inspect.isclass(plugin_class):
+                logger.error(f"{class_name} is not a class")
+                return None
+
             if not issubclass(plugin_class, Plugin):
                 logger.error(f"{class_name} is not a subclass of Plugin")
                 return None
@@ -245,6 +249,7 @@ class PluginManager:
                             issubclass(obj, Plugin)
                             and obj is not Plugin
                             and not inspect.isabstract(obj)
+                            and obj.__module__ == module.__name__
                         ):
                             plugin = obj()
                             await plugin.setup()
@@ -277,6 +282,7 @@ class PluginManager:
         for plugin in self.plugins.values():
             try:
                 await plugin.teardown()
+                plugin._is_setup = False
             except Exception as e:
                 logger.error(f"Failed to teardown plugin {plugin.name}: {e}")
 

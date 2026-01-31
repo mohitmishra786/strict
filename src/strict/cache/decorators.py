@@ -169,7 +169,7 @@ def cached(
                 await get_cache().set(cache_key, result, ttl)
                 return result
 
-            except (RedisError, json.JSONDecodeError, ConnectionError) as e:
+            except (RedisError, json.JSONDecodeError) as e:
                 logger.warning(f"Cache error: {e}, falling back to function call")
                 cache_stats.record_error()
                 return await func(*args, **kwargs)
@@ -217,7 +217,7 @@ def cached(
 
                 return result
 
-            except (RedisError, json.JSONDecodeError, ConnectionError) as e:
+            except (RedisError, json.JSONDecodeError) as e:
                 logger.warning(f"Cache error: {e}, falling back to function call")
                 cache_stats.record_error()
                 return func(*args, **kwargs)
@@ -261,7 +261,7 @@ def cache_result(
                 await get_cache().set(cache_key, result, ttl)
                 return result
 
-            except (RedisError, json.JSONDecodeError, ConnectionError):
+            except (RedisError, json.JSONDecodeError):
                 cache_stats.record_error()
                 return await func(*args, **kwargs)
 
@@ -295,7 +295,7 @@ def cache_result(
 
                 return result
 
-            except (RedisError, json.JSONDecodeError, ConnectionError):
+            except (RedisError, json.JSONDecodeError):
                 cache_stats.record_error()
                 return func(*args, **kwargs)
 
@@ -307,5 +307,5 @@ def cache_result(
     return decorator
 
 
-# Global cache stats instance (thread-safe version created earlier in file)
-# NOTE: cache_stats is instantiated at line 74, no duplicate assignment here
+# Global cache stats instance (thread-safe version created earlier in this file)
+# NOTE: cache_stats is instantiated earlier in this file, no duplicate assignment here

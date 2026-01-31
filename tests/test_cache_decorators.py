@@ -26,7 +26,7 @@ def mock_cache_backend():
         async def mock_get(key):
             return storage.get(key)
 
-        async def mock_set(key, value, ttl=None):
+        async def mock_set(key, value, _ttl=None):
             storage[key] = value
 
         mock_instance.get = AsyncMock(side_effect=mock_get)

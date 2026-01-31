@@ -228,7 +228,13 @@ def get_settings() -> StrictSettings:
         # In debug mode, provide helpful development defaults
         import os
 
-        if os.getenv("STRICT_DEBUG"):
+        if os.getenv("STRICT_DEBUG", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "y",
+            "on",
+        ):
             warnings.warn(
                 "Using DEBUG MODE with insecure defaults - NOT FOR PRODUCTION",
                 stacklevel=2,
