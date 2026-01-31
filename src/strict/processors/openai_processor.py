@@ -82,11 +82,12 @@ class OpenAIProcessor(BaseProcessor):
         ]
 
         try:
-            stream = await self.client.chat.completions.create(
+            stream = await self.client.with_options(
+                timeout=request.timeout_seconds
+            ).chat.completions.create(
                 model=self.model,
                 messages=messages,  # type: ignore
                 stream=True,
-                timeout=request.timeout_seconds,
             )
             async for chunk in stream:
                 if chunk.choices[0].delta.content:

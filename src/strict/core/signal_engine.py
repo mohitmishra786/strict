@@ -91,8 +91,6 @@ class SignalEngine:
         _, magnitude = SignalEngine.compute_fft(
             signal_data.values, signal_data.sample_rate
         )
-        if magnitude.size == 0:
-            return SignalData(values=[], sample_rate=signal_data.sample_rate / 2)
 
         return SignalData(
             values=magnitude.tolist(),

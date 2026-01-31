@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -66,9 +67,9 @@ async def validate_token(token: str) -> Optional[TokenData]:
 
 async def validate_api_key(api_key: str) -> Optional[TokenData]:
     """Validate an API key and return TokenData."""
-    valid_keys = [key.get_secret_value() for key in settings.valid_api_keys]
-    if api_key in valid_keys:
-        return TokenData(username="api_key_user")
+    for key in settings.valid_api_keys:
+        if secrets.compare_digest(api_key, key.get_secret_value()):
+            return TokenData(username="api_key_user")
     return None
 
 
@@ -100,14 +101,23 @@ async def verify_api_key(
 
 
 async def get_current_user_or_apikey(
-    token_user: Optional[TokenData] = Depends(get_current_user),
+    token: Optional[str] = Depends(oauth2_scheme),
     api_key_user: Optional[TokenData] = Depends(verify_api_key),
 ) -> TokenData:
     """Allow either OAuth2 or API Key authentication."""
     if api_key_user:
         return api_key_user
-    if token_user:
-        return token_user
+
+    if token:
+        user = await validate_token(token)
+        if user:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",

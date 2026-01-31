@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use reqwest::header::{HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ProcessorType {
@@ -25,6 +26,8 @@ pub struct ValidationResult {
     pub is_valid: bool,
     pub input_hash: String,
     pub errors: Vec<String>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,12 +64,15 @@ impl Client {
         }
 
         let url = format!("{}/process/request", self.base_url);
-        let response = self.http_client
-            .post(url)
-            .headers(headers)
-            .json(request)
-            .send()
-            .await?;
+        let mut req = self.http_client.post(url).headers(headers).json(request);
+
+        if let Some(timeout_seconds) = request.timeout_seconds.filter(|s| *s > 0.0) {
+            req = req.timeout(Duration::from_secs_f64(timeout_seconds));
+        } else {
+            req = req.timeout(Duration::from_secs(30));
+        }
+
+        let response = req.send().await?;
 
         if !response.status().is_success() {
             let status = response.status();

@@ -187,10 +187,10 @@ async def websocket_stream(websocket: WebSocket):
 
             except ValidationError as e:
                 await websocket.send_json({"type": "error", "content": str(e)})
-            except Exception as e:
-                logger.exception("Error processing WebSocket request")
+            except Exception:
+                logger.exception("Error processing WebSocket request", exc_info=True)
                 await websocket.send_json(
-                    {"type": "error", "content": f"Internal error: {str(e)}"}
+                    {"type": "error", "content": "Internal server error"}
                 )
 
     except WebSocketDisconnect:

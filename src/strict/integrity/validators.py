@@ -223,6 +223,15 @@ def validate_feature_value(value: Any, schema: FeatureSchema) -> tuple[bool, str
                 False,
                 f"Feature '{schema.name}' must be numeric, got {type(value).__name__}",
             )
+
+        import math
+
+        if not math.isfinite(value):
+            return (
+                False,
+                f"Feature '{schema.name}' must be finite, got {value}",
+            )
+
         if schema.min_value is not None and value < schema.min_value:
             return (
                 False,

@@ -11,6 +11,7 @@ from strict.integrity.schemas import (
     ValidationResult,
     ValidationStatus,
 )
+from strict.integrity.validators import compute_input_hash
 from strict.processors.base import BaseProcessor
 
 
@@ -45,12 +46,13 @@ class OllamaProcessor(BaseProcessor):
                 json.JSONDecodeError,
             ) as e:
                 duration = (time.time() - start_time) * 1000
+                input_hash = compute_input_hash(request.input_data)[:16]
                 return OutputSchema(
                     result="",
                     validation=ValidationResult(
                         status=ValidationStatus.FAILURE,
                         is_valid=False,
-                        input_hash="hash_placeholder",
+                        input_hash=input_hash,
                         errors=(f"Ollama error: {str(e)}",),
                         warnings=(),
                     ),
@@ -77,6 +79,7 @@ class OllamaProcessor(BaseProcessor):
                     },
                     timeout=request.timeout_seconds,
                 ) as response:
+                    response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line:
                             continue

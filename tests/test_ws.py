@@ -1,25 +1,21 @@
 import pytest
 from fastapi.testclient import TestClient
+from fastapi.websockets import WebSocketDisconnect
+from pydantic import SecretStr
 from strict.api.server import app
 from strict.config import settings
 
 
-from pydantic import SecretStr
-
-
-def get_api_key():
-    if settings.valid_api_keys:
-        return settings.valid_api_keys[0].get_secret_value()
-    return "test-api-key"
+def register_test_api_key():
+    api_key = "test-api-key"
+    if not any(k.get_secret_value() == api_key for k in settings.valid_api_keys):
+        settings.valid_api_keys.append(SecretStr(api_key))
+    return api_key
 
 
 def test_websocket_connection():
     client = TestClient(app)
-    api_key_plain = get_api_key()
-
-    # Update valid keys for test if needed
-    if not any(k.get_secret_value() == api_key_plain for k in settings.valid_api_keys):
-        settings.valid_api_keys.append(SecretStr(api_key_plain))
+    api_key_plain = register_test_api_key()
 
     try:
         with client.websocket_connect(
@@ -49,7 +45,7 @@ def test_websocket_connection():
 
 def test_websocket_invalid_data():
     client = TestClient(app)
-    api_key_plain = get_api_key()
+    api_key_plain = register_test_api_key()
 
     with client.websocket_connect(f"/ws/stream?api_key={api_key_plain}") as websocket:
         # Send invalid data (missing required fields)
@@ -62,8 +58,6 @@ def test_websocket_invalid_data():
 def test_websocket_unauthorized():
     client = TestClient(app)
     # No api_key or token
-    with pytest.raises(
-        Exception
-    ):  # TestClient raises when connection is closed with error code
-        with client.websocket_connect("/ws/stream") as websocket:
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/stream"):
             pass

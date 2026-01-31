@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 export enum SignalType {
   ANALOG = 'analog',
@@ -24,6 +24,7 @@ export interface ValidationResult {
   is_valid: boolean;
   input_hash: string;
   errors: string[];
+  warnings?: string[];
 }
 
 export interface OutputSchema {
@@ -44,8 +45,8 @@ export class StrictClient {
   }
 
   async processRequest(request: ProcessingRequest): Promise<OutputSchema> {
-    const timeout = request.timeout_seconds ? request.timeout_seconds * 1000 : 30000;
-    const response = await axios.post(`${this.baseUrl}/process/request`, request, {
+    const timeout = (request.timeout_seconds ?? 30) * 1000;
+    const response: AxiosResponse<OutputSchema> = await axios.post(`${this.baseUrl}/process/request`, request, {
       headers: this.apiKey ? { 'X-API-Key': this.apiKey } : {},
       timeout,
     });

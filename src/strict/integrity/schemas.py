@@ -167,6 +167,17 @@ class FeatureSchema(BaseModel):
     max_value: float | None = None
     allowed_values: tuple[Any, ...] | None = None
 
+    @model_validator(mode="after")
+    def validate_bounds(self) -> FeatureSchema:
+        """Ensure min_value <= max_value for numeric features."""
+        if self.feature_type == FeatureType.NUMERIC:
+            if self.min_value is not None and self.max_value is not None:
+                if self.min_value > self.max_value:
+                    raise ValueError(
+                        f"min_value ({self.min_value}) must be <= max_value ({self.max_value})"
+                    )
+        return self
+
 
 class MLModelConfig(BaseModel):
     """Configuration for an ML model."""
@@ -203,6 +214,7 @@ class MLModelValidationRequest(BaseModel):
         import json
 
         errors = []
+        validated_features = {}
         # Check if all required features are present
         schema_features = {f.name: f for f in self.model_info.features}
 
@@ -221,10 +233,19 @@ class MLModelValidationRequest(BaseModel):
             is_valid, error_msg = validate_feature_value(value, schema_features[name])
             if not is_valid:
                 errors.append(error_msg)
+            else:
+                validated_features[name] = value
 
-        input_hash = compute_input_hash(
-            json.dumps(self.input_features, sort_keys=True)
-        )[:16]
+        # Deterministic hashing of only validated, serializable features
+        try:
+            # We use a subset of features that are known to be part of the schema
+            # and passed validation. For extra safety, we handle serialization errors.
+            hash_data = json.dumps(validated_features, sort_keys=True)
+        except (TypeError, ValueError):
+            # Fallback to a deterministic representation if not serializable
+            hash_data = str(sorted(validated_features.items()))
+
+        input_hash = compute_input_hash(hash_data)[:16]
 
         if errors:
             return ValidationResult(
