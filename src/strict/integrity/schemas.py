@@ -105,6 +105,50 @@ class ValidationStatus(str, Enum):
 # -----------------------------------------------------------------------------
 
 
+class SignalData(BaseModel):
+    """Raw signal data with basic validation.
+
+    Used for signal processing operations.
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    values: list[float] = Field(description="Signal sample values")
+    sample_rate: PositiveFloat = Field(description="Sample rate in Hz")
+
+    @model_validator(mode="after")
+    def validate_signal_length(self) -> SignalData:
+        """Ensure signal has at least one sample."""
+        if len(self.values) == 0:
+            raise ValueError("Signal data must contain at least one sample")
+        return self
+
+    def validate(self) -> ValidationResult:
+        """Validate the signal data.
+
+        Returns:
+            ValidationResult with validation status.
+        """
+        errors: list[str] = []
+
+        if len(self.values) == 0:
+            errors.append("Signal data must contain at least one sample")
+
+        if self.sample_rate <= 0:
+            errors.append("Sample rate must be positive")
+
+        import hashlib
+
+        input_hash = hashlib.sha256(str(self.values).encode()).hexdigest()[:16]
+
+        return ValidationResult(
+            status=ValidationStatus.SUCCESS if not errors else ValidationStatus.FAILURE,
+            is_valid=len(errors) == 0,
+            input_hash=input_hash,
+            errors=tuple(errors),
+        )
+
+
 class SignalConfig(BaseModel):
     """Configuration for signal processing with physical constraints.
 
@@ -227,9 +271,7 @@ class ValidationResult(BaseModel):
     status: ValidationStatus
     is_valid: bool
     input_hash: str = Field(description="Hash of the input for traceability")
-    errors: tuple[str, ...] = Field(
-        default=(), description="Validation error messages"
-    )
+    errors: tuple[str, ...] = Field(default=(), description="Validation error messages")
     warnings: tuple[str, ...] = Field(
         default=(), description="Validation warning messages"
     )
