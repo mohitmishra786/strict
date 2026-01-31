@@ -100,6 +100,36 @@ class ValidationStatus(str, Enum):
     PARTIAL = "partial"
 
 
+class Region(str, Enum):
+    """Supported deployment regions."""
+
+    US_EAST = "us-east-1"
+    US_WEST = "us-west-2"
+    EU_CENTRAL = "eu-central-1"
+    AP_SOUTHEAST = "ap-southeast-1"
+
+
+class RegionConfig(BaseModel):
+    """Configuration for a specific region."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    region: Region
+    endpoint: str
+    latency_ms: float = Field(default=0.0, ge=0.0)
+    is_active: bool = True
+
+
+class GeoRoutingConfig(BaseModel):
+    """Configuration for multi-region geo-routing."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    regions: tuple[RegionConfig, ...]
+    primary_region: Region
+    failover_enabled: bool = True
+
+
 class FeatureType(str, Enum):
     """Type of feature in an ML model."""
 
