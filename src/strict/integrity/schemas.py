@@ -226,8 +226,7 @@ class MLModelValidationRequest(BaseModel):
         # Validate provided features
         for name, value in self.input_features.items():
             if name not in schema_features:
-                # Optional: Handle extra features? For strictness, we might reject them.
-                # errors.append(f"Unknown feature: {name}")
+                errors.append(f"Unknown feature: {name}")
                 continue
 
             is_valid, error_msg = validate_feature_value(value, schema_features[name])

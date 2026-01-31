@@ -60,6 +60,13 @@ class SignalEngine:
 
         nyquist = 0.5 * fs
         if isinstance(cutoff, list):
+            # Bandpass/Bandstop check
+            if len(cutoff) == 2:
+                if cutoff[0] >= cutoff[1]:
+                    raise ValueError(
+                        f"For bandpass cutoff, low ({cutoff[0]}) must be < high ({cutoff[1]})"
+                    )
+
             for c in cutoff:
                 if c <= 0 or c >= nyquist:
                     raise ValueError(

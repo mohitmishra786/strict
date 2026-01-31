@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from strict.core.signal_engine import SignalEngine
-from strict.integrity.schemas import SignalConfig, SignalType
+from strict.integrity.schemas import SignalConfig, SignalType, SignalData
 
 
 def test_generate_signal():
@@ -29,6 +29,16 @@ def test_fft():
     peak_idx = np.argmax(mag)
     peak_freq = freq[peak_idx]
     assert abs(peak_freq - 10.0) < 1.0
+
+
+def test_filter_invalid_bandpass():
+    fs = 100.0
+    sig = [0.0] * 100
+    # Reversed bandpass cutoff should raise ValueError
+    with pytest.raises(ValueError, match="low.*must be < high"):
+        SignalEngine.bandpass_filter(
+            SignalData(values=sig, sample_rate=fs), low=40.0, high=10.0
+        )
 
 
 def test_lowpass_filter():

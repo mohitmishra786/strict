@@ -89,6 +89,19 @@ class TestMLModelValidation:
         assert result.status == ValidationStatus.FAILURE
         assert any("fashion" in err for err in result.errors)
 
+    def test_unknown_feature(self, model_config: MLModelConfig) -> None:
+        """Unknown feature should fail validation in strict mode."""
+        request = MLModelValidationRequest(
+            model_info=model_config,
+            input_features={
+                "text": "Valid text",
+                "unknown_field": "some value",
+            },
+        )
+        result = request.validate_inputs()
+        assert result.status == ValidationStatus.FAILURE
+        assert any("unknown feature" in err.lower() for err in result.errors)
+
     def test_model_version_pattern(self) -> None:
         """Model version must follow semver pattern."""
         with pytest.raises(ValidationError):
