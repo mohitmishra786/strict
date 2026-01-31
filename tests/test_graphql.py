@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from strict.api.server import app
 

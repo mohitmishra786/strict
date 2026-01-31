@@ -3,7 +3,6 @@ from typing import Any, AsyncGenerator
 
 from groq import AsyncGroq, APIError
 from strict.config import settings
-from strict.core.interfaces import AsyncProcessor
 from strict.integrity.schemas import (
     ProcessingRequest,
     OutputSchema,
@@ -22,8 +21,10 @@ class GroqProcessor(BaseProcessor):
             settings.groq_api_key.get_secret_value() if settings.groq_api_key else None
         )
         if not api_key:
-            # Fallback for development/testing
-            api_key = "dummy-key"
+            if settings.allow_dummy_key or settings.debug:
+                api_key = "dummy-key"
+            else:
+                raise ValueError("Groq API key is missing. Set STRICT_GROQ_API_KEY.")
         self.client = AsyncGroq(api_key=api_key)
         self.model = "llama-3.3-70b-versatile"  # Default model
 
@@ -43,11 +44,11 @@ class GroqProcessor(BaseProcessor):
             # Groq async client
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=messages,  # type: ignore
                 timeout=request.timeout_seconds,
             )
             result = response.choices[0].message.content or ""
-        except Exception as e:
+        except APIError as e:
             # Return failed ValidationResult for API errors
             duration = (time.time() - start_time) * 1000
             return OutputSchema(
@@ -57,6 +58,21 @@ class GroqProcessor(BaseProcessor):
                     is_valid=False,
                     input_hash="hash_placeholder",
                     errors=(f"Groq API error: {str(e)}",),
+                    warnings=(),
+                ),
+                processor_used=ProcessorType.CLOUD,
+                processing_time_ms=duration,
+                retries_attempted=0,
+            )
+        except Exception as e:
+            duration = (time.time() - start_time) * 1000
+            return OutputSchema(
+                result="",
+                validation=ValidationResult(
+                    status=ValidationStatus.FAILURE,
+                    is_valid=False,
+                    input_hash="hash_placeholder",
+                    errors=(f"Internal error: {str(e)}",),
                     warnings=(),
                 ),
                 processor_used=ProcessorType.CLOUD,
@@ -81,11 +97,14 @@ class GroqProcessor(BaseProcessor):
         try:
             stream = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=messages,  # type: ignore
                 stream=True,
+                timeout=request.timeout_seconds,
             )
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-        except Exception:
-            yield "Error during streaming"
+        except APIError as e:
+            yield f"Groq streaming error: {str(e)}"
+        except Exception as e:
+            yield f"Internal streaming error: {str(e)}"

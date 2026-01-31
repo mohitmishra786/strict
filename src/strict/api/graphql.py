@@ -127,7 +127,7 @@ class Subscription:
             processor_type=ProcessorType(processor_type.value),
         )
 
-        processor = await processor_manager.get_processor(request)
+        processor = processor_manager.get_processor(request)
         async for chunk in processor.stream_process(request):
             yield chunk
 

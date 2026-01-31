@@ -77,7 +77,7 @@ def validate_with_retry(
     raw_input: dict[str, Any],
     schema: type[T],
     max_retries: int = 3,
-    transform_fn: Callable | None = None,
+    transform_fn: Callable[[dict[str, Any], list[str]], dict[str, Any]] | None = None,
 ) -> tuple[T | None, list[str], int]:
     """Validate with optional transformation and retry logic.
 

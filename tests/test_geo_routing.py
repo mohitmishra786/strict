@@ -31,10 +31,25 @@ class TestGeoRouting:
         engine = GeoRoutingEngine(geo_config)
 
         # Test mock IP routing
-        assert engine.get_nearest_region("1.2.3.4").region == Region.AP_SOUTHEAST
+        # 1.2.3.4 would be AP_SOUTHEAST but it is inactive, so should return primary (US_EAST)
+        assert engine.get_nearest_region("1.2.3.4").region == Region.US_EAST
         assert engine.get_nearest_region("2.3.4.5").region == Region.EU_CENTRAL
         assert engine.get_nearest_region("3.4.5.6").region == Region.US_WEST
         assert engine.get_nearest_region("8.8.8.8").region == Region.US_EAST
+
+    def test_inactive_region_failover_flow(self, geo_config: GeoRoutingConfig) -> None:
+        engine = GeoRoutingEngine(geo_config)
+
+        # Manually request an inactive region's config
+        config = engine.get_region_config(Region.AP_SOUTHEAST)
+        assert config is not None
+        assert config.is_active is False
+
+        # Flow: Caller sees inactive -> calls get_failover_region
+        failover = engine.get_failover_region(Region.AP_SOUTHEAST)
+        assert failover is not None
+        assert failover.is_active is True
+        assert failover.region == Region.US_EAST
 
     def test_failover_logic(self, geo_config: GeoRoutingConfig) -> None:
         engine = GeoRoutingEngine(geo_config)

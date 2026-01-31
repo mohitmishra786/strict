@@ -129,6 +129,16 @@ class GeoRoutingConfig(BaseModel):
     primary_region: Region
     failover_enabled: bool = True
 
+    @model_validator(mode="after")
+    def validate_primary_region(self) -> GeoRoutingConfig:
+        """Ensure primary_region is in the regions list."""
+        region_values = {r.region for r in self.regions}
+        if self.primary_region not in region_values:
+            raise ValueError(
+                f"primary_region '{self.primary_region}' not found in regions list"
+            )
+        return self
+
 
 class FeatureType(str, Enum):
     """Type of feature in an ML model."""

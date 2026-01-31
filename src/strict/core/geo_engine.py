@@ -25,7 +25,7 @@ class GeoRoutingEngine:
             region_name = Region.US_EAST
 
         config = self.get_region_config(region_name)
-        if config:
+        if config and config.is_active:
             return config
         return self.get_primary_region()
 

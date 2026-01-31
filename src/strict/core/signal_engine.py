@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
 import numpy as np
 import scipy.signal as signal
 
-from strict.integrity.schemas import SignalData
+from strict.integrity.schemas import SignalData, SignalConfig
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -20,14 +19,7 @@ class SignalEngine:
 
     @staticmethod
     def generate_signal(config: SignalConfig) -> list[float]:
-        """Generate a signal based on configuration.
-
-        Args:
-            config: Signal configuration.
-
-        Returns:
-            Generated signal sample values.
-        """
+        """Generate a signal based on configuration."""
         t = np.linspace(
             0,
             config.duration,
@@ -41,38 +33,53 @@ class SignalEngine:
     def compute_fft(
         values: list[float] | NDArray, sample_rate: float
     ) -> tuple[NDArray, NDArray]:
-        """Compute FFT magnitude and frequency bins.
-
-        Args:
-            values: Signal values.
-            sample_rate: Sampling rate in Hz.
-
-        Returns:
-            Tuple of (frequencies, magnitudes).
-        """
+        """Compute FFT magnitude and frequency bins."""
         data = np.array(values)
         n = len(data)
+        if n == 0:
+            return np.array([]), np.array([])
+
         freq = np.fft.rfftfreq(n, d=1 / sample_rate)
         mag = np.abs(np.fft.rfft(data)) / n
         return freq, mag
 
     @staticmethod
+    def _validate_filter_params(
+        values: list[float] | NDArray,
+        cutoff: float | list[float],
+        fs: float,
+        order: int,
+    ) -> float:
+        """Validate common filter parameters."""
+        if fs <= 0:
+            raise ValueError("Sampling rate (fs) must be positive")
+        if len(values) == 0:
+            raise ValueError("Input values cannot be empty")
+        if order <= 0:
+            raise ValueError("Filter order must be a positive integer")
+
+        nyquist = 0.5 * fs
+        if isinstance(cutoff, list):
+            for c in cutoff:
+                if c <= 0 or c >= nyquist:
+                    raise ValueError(
+                        f"Cutoff frequency {c} must be between 0 and {nyquist}"
+                    )
+        else:
+            if cutoff <= 0 or cutoff >= nyquist:
+                raise ValueError(
+                    f"Cutoff frequency {cutoff} must be between 0 and {nyquist}"
+                )
+
+        return nyquist
+
+    @staticmethod
     def apply_lowpass_filter(
         values: list[float] | NDArray, cutoff: float, fs: float, order: int = 5
     ) -> list[float]:
-        """Apply lowpass filter to raw values.
-
-        Args:
-            values: Signal values.
-            cutoff: Cutoff frequency in Hz.
-            fs: Sampling rate in Hz.
-            order: Filter order.
-
-        Returns:
-            Filtered values as list.
-        """
+        """Apply lowpass filter to raw values."""
+        nyquist = SignalEngine._validate_filter_params(values, cutoff, fs, order)
         data = np.array(values)
-        nyquist = 0.5 * fs
         normal_cutoff = cutoff / nyquist
         b, a = signal.butter(order, normal_cutoff, btype="low", analog=False)
         y = signal.lfilter(b, a, data)
@@ -80,17 +87,12 @@ class SignalEngine:
 
     @staticmethod
     def fft(signal_data: SignalData) -> SignalData:
-        """Compute FFT of the signal data.
-
-        Args:
-            signal_data: Input signal data.
-
-        Returns:
-            New SignalData with FFT magnitude values.
-        """
-        data = np.array(signal_data.values)
-        n = len(data)
-        magnitude = np.abs(np.fft.rfft(data)) / n
+        """Compute FFT of the signal data."""
+        _, magnitude = SignalEngine.compute_fft(
+            signal_data.values, signal_data.sample_rate
+        )
+        if magnitude.size == 0:
+            return SignalData(values=[], sample_rate=signal_data.sample_rate / 2)
 
         return SignalData(
             values=magnitude.tolist(),
@@ -103,24 +105,12 @@ class SignalEngine:
         cutoff: float,
         order: int = 5,
     ) -> SignalData:
-        """Apply Butterworth lowpass filter.
-
-        Args:
-            signal_data: Input signal data.
-            cutoff: Cutoff frequency in Hz.
-            order: Filter order (default: 5).
-
-        Returns:
-            New SignalData with filtered values.
-        """
-        data = np.array(signal_data.values)
-        nyquist = 0.5 * signal_data.sample_rate
-        normal_cutoff = cutoff / nyquist
-        b, a = signal.butter(order, normal_cutoff, btype="low", analog=False)
-        y = signal.lfilter(b, a, data)
-
+        """Apply Butterworth lowpass filter."""
+        filtered = SignalEngine.apply_lowpass_filter(
+            signal_data.values, cutoff, signal_data.sample_rate, order
+        )
         return SignalData(
-            values=y.tolist(),
+            values=filtered,
             sample_rate=signal_data.sample_rate,
         )
 
@@ -130,18 +120,11 @@ class SignalEngine:
         cutoff: float,
         order: int = 5,
     ) -> SignalData:
-        """Apply Butterworth highpass filter.
-
-        Args:
-            signal_data: Input signal data.
-            cutoff: Cutoff frequency in Hz.
-            order: Filter order (default: 5).
-
-        Returns:
-            New SignalData with filtered values.
-        """
+        """Apply Butterworth highpass filter."""
+        nyquist = SignalEngine._validate_filter_params(
+            signal_data.values, cutoff, signal_data.sample_rate, order
+        )
         data = np.array(signal_data.values)
-        nyquist = 0.5 * signal_data.sample_rate
         normal_cutoff = cutoff / nyquist
         b, a = signal.butter(order, normal_cutoff, btype="high", analog=False)
         y = signal.lfilter(b, a, data)
@@ -158,19 +141,11 @@ class SignalEngine:
         high: float,
         order: int = 5,
     ) -> SignalData:
-        """Apply Butterworth bandpass filter.
-
-        Args:
-            signal_data: Input signal data.
-            low: Low cutoff frequency in Hz.
-            high: High cutoff frequency in Hz.
-            order: Filter order (default: 5).
-
-        Returns:
-            New SignalData with filtered values.
-        """
+        """Apply Butterworth bandpass filter."""
+        nyquist = SignalEngine._validate_filter_params(
+            signal_data.values, [low, high], signal_data.sample_rate, order
+        )
         data = np.array(signal_data.values)
-        nyquist = 0.5 * signal_data.sample_rate
         low_normal = low / nyquist
         high_normal = high / nyquist
         b, a = signal.butter(
@@ -187,15 +162,10 @@ class SignalEngine:
     def compute_statistics(
         signal_data: SignalData,
     ) -> dict[str, float]:
-        """Compute basic statistics for signal data.
-
-        Args:
-            signal_data: Input signal data.
-
-        Returns:
-            Dictionary with mean, std, min, max.
-        """
+        """Compute basic statistics for signal data."""
         data = np.array(signal_data.values)
+        if data.size == 0:
+            return {"mean": 0.0, "std": 0.0, "min": 0.0, "max": 0.0}
         return {
             "mean": float(np.mean(data)),
             "std": float(np.std(data)),

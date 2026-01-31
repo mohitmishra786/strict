@@ -174,6 +174,10 @@ class StrictSettings(BaseSettings):
         default=True,
         description="Enable automatic failover to local on cloud failure",
     )
+    allow_dummy_key: bool = Field(
+        default=False,
+        description="Allow dummy API keys for development/testing",
+    )
 
     @model_validator(mode="after")
     def validate_security_in_production(self) -> "StrictSettings":

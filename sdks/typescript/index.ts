@@ -31,6 +31,7 @@ export interface OutputSchema {
   validation: ValidationResult;
   processor_used: ProcessorType;
   processing_time_ms: number;
+  retries_attempted: number;
 }
 
 export class StrictClient {
@@ -43,8 +44,10 @@ export class StrictClient {
   }
 
   async processRequest(request: ProcessingRequest): Promise<OutputSchema> {
+    const timeout = request.timeout_seconds ? request.timeout_seconds * 1000 : 30000;
     const response = await axios.post(`${this.baseUrl}/process/request`, request, {
       headers: this.apiKey ? { 'X-API-Key': this.apiKey } : {},
+      timeout,
     });
     return response.data;
   }

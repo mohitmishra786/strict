@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from strict.integrity.schemas import FeatureSchema
 
 
 # -----------------------------------------------------------------------------
@@ -193,7 +196,7 @@ def validate_token_processor_compatibility(
     return (True, "")
 
 
-def validate_feature_value(value: Any, schema: Any) -> tuple[bool, str]:
+def validate_feature_value(value: Any, schema: FeatureSchema) -> tuple[bool, str]:
     """Validate a single feature value against its schema.
 
     Args:
@@ -209,6 +212,12 @@ def validate_feature_value(value: Any, schema: Any) -> tuple[bool, str]:
         return True, ""
 
     if schema.feature_type == "numeric":
+        # Explicitly reject bools as they are instances of int
+        if isinstance(value, bool):
+            return (
+                False,
+                f"Feature '{schema.name}' must be numeric, got bool",
+            )
         if not isinstance(value, (int, float)):
             return (
                 False,

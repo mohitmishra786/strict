@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from strict.observability.logging import get_logger
 
 logger = get_logger(__name__)
@@ -20,8 +20,13 @@ class ConnectionManager:
 
     def disconnect(self, websocket: WebSocket):
         """Remove connection from active list."""
-        self.active_connections.remove(websocket)
-        logger.info(f"Connection closed. Total active: {len(self.active_connections)}")
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            logger.info(
+                f"Connection closed. Total active: {len(self.active_connections)}"
+            )
+        else:
+            logger.warning("Attempted to disconnect an inactive websocket")
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """Send message to a specific connection."""

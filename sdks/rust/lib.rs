@@ -2,16 +2,6 @@ use serde::{Deserialize, Serialize};
 use reqwest::header::{HeaderMap, HeaderValue};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum SignalType {
-    #[serde(rename = "analog")]
-    Analog,
-    #[serde(rename = "digital")]
-    Digital,
-    #[serde(rename = "hybrid")]
-    Hybrid,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub enum ProcessorType {
     #[serde(rename = "cloud")]
     Cloud,
@@ -43,6 +33,8 @@ pub struct OutputSchema {
     pub validation: ValidationResult,
     pub processor_used: ProcessorType,
     pub processing_time_ms: f64,
+    #[serde(default)]
+    pub retries_attempted: u32,
 }
 
 pub struct Client {
@@ -60,10 +52,12 @@ impl Client {
         }
     }
 
-    pub async fn process_request(&self, request: &ProcessingRequest) -> Result<OutputSchema, reqwest::Error> {
+    pub async fn process_request(&self, request: &ProcessingRequest) -> Result<OutputSchema, Box<dyn std::error::Error>> {
         let mut headers = HeaderMap::new();
         if let Some(ref key) = self.api_key {
-            headers.insert("X-API-Key", HeaderValue::from_str(key).unwrap());
+            let header_value = HeaderValue::from_str(key)
+                .map_err(|e| format!("Invalid API key header: {}", e))?;
+            headers.insert("X-API-Key", header_value);
         }
 
         let url = format!("{}/process/request", self.base_url);
@@ -74,6 +68,13 @@ impl Client {
             .send()
             .await?;
 
-        response.json::<OutputSchema>().await
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(format!("Request failed with status {}: {}", status, text).into());
+        }
+
+        let output = response.json::<OutputSchema>().await?;
+        Ok(output)
     }
 }

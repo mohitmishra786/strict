@@ -2,9 +2,11 @@ package strict
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type SignalType string
@@ -46,24 +48,36 @@ type OutputSchema struct {
 }
 
 type Client struct {
-	BaseURL string
-	APIKey  string
+	BaseURL    string
+	APIKey     string
+	httpClient *http.Client
 }
 
 func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
 		BaseURL: baseURL,
 		APIKey:  apiKey,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
-func (c *Client) ProcessRequest(req ProcessingRequest) (*OutputSchema, error) {
+func (c *Client) ProcessRequest(ctx context.Context, req ProcessingRequest) (*OutputSchema, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	httpReq, err := http.NewRequest("POST", c.BaseURL+"/process/request", bytes.NewBuffer(data))
+	// Use request timeout if specified, otherwise rely on context
+	requestCtx := ctx
+	if req.TimeoutSeconds > 0 {
+		var cancel context.CancelFunc
+		requestCtx, cancel = context.WithTimeout(ctx, time.Duration(req.TimeoutSeconds*float64(time.Second)))
+		defer cancel()
+	}
+
+	httpReq, err := http.NewRequestWithContext(requestCtx, "POST", c.BaseURL+"/process/request", bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +87,7 @@ func (c *Client) ProcessRequest(req ProcessingRequest) (*OutputSchema, error) {
 		httpReq.Header.Set("X-API-Key", c.APIKey)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(httpReq)
+	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}

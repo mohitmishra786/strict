@@ -85,5 +85,12 @@ class OllamaProcessor(BaseProcessor):
                             yield data["response"]
                         if data.get("done"):
                             break
-            except Exception:
-                yield "Error during streaming"
+            except (
+                httpx.HTTPStatusError,
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                json.JSONDecodeError,
+            ) as e:
+                yield f"Ollama streaming error: {str(e)}"
+            except Exception as e:
+                yield f"Internal streaming error: {str(e)}"

@@ -24,8 +24,12 @@ class OpenAIProcessor(BaseProcessor):
             else None
         )
         if not api_key:
-            # Fallback for development/testing
-            api_key = "dummy-key"
+            if settings.allow_dummy_key or settings.debug:
+                api_key = "dummy-key"
+            else:
+                raise ValueError(
+                    "OpenAI API key is missing. Set STRICT_OPENAI_API_KEY."
+                )
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = "gpt-4o-mini"  # Default model
 
@@ -82,9 +86,12 @@ class OpenAIProcessor(BaseProcessor):
                 model=self.model,
                 messages=messages,  # type: ignore
                 stream=True,
+                timeout=request.timeout_seconds,
             )
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-        except Exception:
-            yield "Error during streaming"
+        except APIError as e:
+            yield f"OpenAI streaming error: {str(e)}"
+        except Exception as e:
+            yield f"Internal streaming error: {str(e)}"

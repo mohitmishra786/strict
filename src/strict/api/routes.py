@@ -28,13 +28,17 @@ from strict.api.security import (
     create_access_token,
     get_current_user_or_apikey,
     verify_password,
+    validate_token,
+    validate_api_key,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     TokenData,
 )
 from strict.config import get_settings
+from strict.observability.logging import get_logger
 
 router = APIRouter()
 processor_manager = ProcessorManager()
+logger = get_logger(__name__)
 
 
 @router.post("/token", response_model=Token)
@@ -130,6 +134,37 @@ async def process_request(
 @router.websocket("/ws/stream")
 async def websocket_stream(websocket: WebSocket):
     """WebSocket for real-time streaming processing."""
+    # Authenticate before accepting
+    auth_success = False
+
+    # 1. Check API Key in headers
+    api_key = websocket.headers.get("x-api-key")
+    if api_key:
+        user = await validate_api_key(api_key)
+        if user:
+            auth_success = True
+
+    # 2. Check Bearer token in headers
+    if not auth_success:
+        auth_header = websocket.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token = auth_header[7:]
+            user = await validate_token(token)
+            if user:
+                auth_success = True
+
+    # 3. Fallback to query parameters
+    if not auth_success:
+        api_key = websocket.query_params.get("api_key")
+        if api_key:
+            user = await validate_api_key(api_key)
+            if user:
+                auth_success = True
+
+    if not auth_success:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await manager.connect(websocket)
     try:
         while True:
@@ -142,10 +177,9 @@ async def websocket_stream(websocket: WebSocket):
                 request = dto.to_domain()
 
                 # Get appropriate processor
-                processor = await processor_manager.get_processor(request)
+                processor = processor_manager.get_processor(request)
 
                 # Stream results back
-
                 async for chunk in processor.stream_process(request):
                     await websocket.send_json({"type": "chunk", "content": chunk})
 
@@ -154,9 +188,12 @@ async def websocket_stream(websocket: WebSocket):
             except ValidationError as e:
                 await websocket.send_json({"type": "error", "content": str(e)})
             except Exception as e:
+                logger.exception("Error processing WebSocket request")
                 await websocket.send_json(
                     {"type": "error", "content": f"Internal error: {str(e)}"}
                 )
 
     except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+    finally:
         manager.disconnect(websocket)
