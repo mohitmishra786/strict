@@ -261,6 +261,19 @@ class MLModelValidationRequest(BaseModel):
         )
 
 
+class SpectrumData(BaseModel):
+    """Frequency-domain spectrum data.
+
+    Contains magnitude values and their corresponding frequency bins.
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    magnitudes: list[float] = Field(description="FFT magnitude values")
+    frequencies: list[float] = Field(description="Frequency bins in Hz")
+    nyquist_frequency: PositiveFloat = Field(description="Nyquist frequency in Hz")
+
+
 class SignalData(BaseModel):
     """Raw signal data with basic validation.
 

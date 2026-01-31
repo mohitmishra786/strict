@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 import numpy as np
 import scipy.signal as signal
 
-from strict.integrity.schemas import SignalData, SignalConfig
+from strict.integrity.schemas import SignalData, SignalConfig, SpectrumData
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -39,8 +39,8 @@ class SignalEngine:
         if n == 0:
             return np.array([]), np.array([])
 
-        freq = np.fft.rfftfreq(n, d=1 / sample_rate)
-        mag = np.abs(np.fft.rfft(data)) / n
+        freq = cast(np.ndarray, np.fft.rfftfreq(n, d=1 / sample_rate))
+        mag = cast(np.ndarray, np.abs(np.fft.rfft(data)) / n)
         return freq, mag
 
     @staticmethod
@@ -88,20 +88,35 @@ class SignalEngine:
         nyquist = SignalEngine._validate_filter_params(values, cutoff, fs, order)
         data = np.array(values)
         normal_cutoff = cutoff / nyquist
-        b, a = signal.butter(order, normal_cutoff, btype="low", analog=False)
-        y = signal.lfilter(b, a, data)
+        # Use cast to ensure type safety for SciPy return values
+        b, a = cast(
+            tuple[np.ndarray, np.ndarray],
+            signal.butter(order, normal_cutoff, btype="low", analog=False),
+        )
+        y = cast(np.ndarray, signal.lfilter(b, a, data))
         return y.tolist()
 
     @staticmethod
-    def fft(signal_data: SignalData) -> SignalData:
-        """Compute FFT of the signal data."""
-        _, magnitude = SignalEngine.compute_fft(
+    def fft(signal_data: SignalData) -> SpectrumData:
+        """Compute FFT of the signal data.
+
+        This method transforms time-domain signal data into frequency-domain magnitudes.
+        The returned SpectrumData contains:
+        - magnitudes: The absolute values of the FFT results.
+        - frequencies: The frequency bins corresponding to each magnitude.
+        - nyquist_frequency: The maximum frequency that can be represented (half the sample rate).
+
+        Returns:
+            SpectrumData containing the frequency-domain representation.
+        """
+        frequencies, magnitude = SignalEngine.compute_fft(
             signal_data.values, signal_data.sample_rate
         )
 
-        return SignalData(
-            values=magnitude.tolist(),
-            sample_rate=signal_data.sample_rate / 2,
+        return SpectrumData(
+            magnitudes=magnitude.tolist(),
+            frequencies=frequencies.tolist(),
+            nyquist_frequency=signal_data.sample_rate / 2,
         )
 
     @staticmethod
@@ -131,8 +146,11 @@ class SignalEngine:
         )
         data = np.array(signal_data.values)
         normal_cutoff = cutoff / nyquist
-        b, a = signal.butter(order, normal_cutoff, btype="high", analog=False)
-        y = signal.lfilter(b, a, data)
+        b, a = cast(
+            tuple[np.ndarray, np.ndarray],
+            signal.butter(order, normal_cutoff, btype="high", analog=False),
+        )
+        y = cast(np.ndarray, signal.lfilter(b, a, data))
 
         return SignalData(
             values=y.tolist(),
@@ -153,10 +171,11 @@ class SignalEngine:
         data = np.array(signal_data.values)
         low_normal = low / nyquist
         high_normal = high / nyquist
-        b, a = signal.butter(
-            order, [low_normal, high_normal], btype="band", analog=False
+        b, a = cast(
+            tuple[np.ndarray, np.ndarray],
+            signal.butter(order, [low_normal, high_normal], btype="band", analog=False),
         )
-        y = signal.lfilter(b, a, data)
+        y = cast(np.ndarray, signal.lfilter(b, a, data))
 
         return SignalData(
             values=y.tolist(),

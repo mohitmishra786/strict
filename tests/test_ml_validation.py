@@ -54,13 +54,14 @@ class TestMLModelValidation:
         request = MLModelValidationRequest(
             model_info=model_config,
             input_features={
-                # "text" is missing
-                "category": "tech",
+                # "text" and "category" are missing
+                "confidence_threshold": 0.5,
             },
         )
         result = request.validate_inputs()
         assert result.status == ValidationStatus.FAILURE
         assert any("text" in err.lower() for err in result.errors)
+        assert any("category" in err.lower() for err in result.errors)
 
     def test_invalid_numeric_range(self, model_config: MLModelConfig) -> None:
         """Numeric value out of range should fail validation."""

@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from strict.core.signal_engine import SignalEngine
-from strict.integrity.schemas import SignalConfig, SignalType, SignalData
+from strict.integrity.schemas import SignalConfig, SignalType, SignalData, SpectrumData
 
 
 def test_generate_signal():
@@ -31,11 +31,27 @@ def test_fft():
     assert abs(peak_freq - 10.0) < 1.0
 
 
+def test_fft_method():
+    fs = 100.0
+    t = np.linspace(0, 1.0, 100, endpoint=False)
+    sig = 0.5 * np.sin(2 * np.pi * 10.0 * t)
+    data = SignalData(values=sig.tolist(), sample_rate=fs)
+
+    result = SignalEngine.fft(data)
+    assert isinstance(result, SpectrumData)
+    assert len(result.magnitudes) > 0
+    assert result.nyquist_frequency == 50.0
+
+    # Peak should be around 10Hz
+    peak_idx = np.argmax(result.magnitudes)
+    assert abs(result.frequencies[peak_idx] - 10.0) < 1.0
+
+
 def test_filter_invalid_bandpass():
     fs = 100.0
     sig = [0.0] * 100
     # Reversed bandpass cutoff should raise ValueError
-    with pytest.raises(ValueError, match="low.*must be < high"):
+    with pytest.raises(ValueError, match=r"low.*must be < high"):
         SignalEngine.bandpass_filter(
             SignalData(values=sig, sample_rate=fs), low=40.0, high=10.0
         )
