@@ -30,6 +30,7 @@ class Plugin(ABC):
         self.version = "1.0.0"
         self.description = "Base plugin"
         self.enabled: bool = True
+        self._is_setup: bool = False
 
     @abstractmethod
     async def setup(self) -> None:
@@ -189,12 +190,23 @@ class PluginManager:
             module = importlib.import_module(module_path)
             plugin_class = getattr(module, class_name)
 
-            if not inspect.issubclass(plugin_class, Plugin):
+            if not inspect.isclass(plugin_class):
+                logger.error(f"{class_name} is not a class")
+                return None
+
+            if not issubclass(plugin_class, Plugin):
                 logger.error(f"{class_name} is not a subclass of Plugin")
+                return None
+
+            if inspect.isabstract(plugin_class):
+                logger.error(
+                    f"{class_name} is an abstract class and cannot be instantiated"
+                )
                 return None
 
             plugin = plugin_class()
             await plugin.setup()
+            plugin._is_setup = True
             self.register_plugin(plugin)
 
             return plugin
@@ -204,7 +216,7 @@ class PluginManager:
             return None
 
     async def load_plugins_from_directory(self, directory: Path) -> list[Plugin]:
-        """Load all plugins from a directory.
+        """Load all plugins from a directory by file path.
 
         Args:
             directory: Directory containing plugin modules.
@@ -212,20 +224,43 @@ class PluginManager:
         Returns:
             List of loaded plugins.
         """
+        import importlib.util
+        import sys
+
         loaded = []
 
         for plugin_file in directory.glob("*_plugin.py"):
-            module_name = plugin_file.stem
+            module_name = f"strict_plugins.{plugin_file.stem}"
 
             try:
-                module = importlib.import_module(f"{directory.stem}.{module_name}")
+                spec = importlib.util.spec_from_file_location(module_name, plugin_file)
+                if spec is None or spec.loader is None:
+                    continue
 
-                for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if issubclass(obj, Plugin) and obj is not Plugin:
-                        plugin = obj()
-                        await plugin.setup()
-                        self.register_plugin(plugin)
-                        loaded.append(plugin)
+                module = importlib.util.module_from_spec(spec)
+                # Register in sys.modules to support relative imports
+                sys.modules[module_name] = module
+
+                try:
+                    spec.loader.exec_module(module)
+
+                    for _, obj in inspect.getmembers(module, inspect.isclass):
+                        if (
+                            issubclass(obj, Plugin)
+                            and obj is not Plugin
+                            and not inspect.isabstract(obj)
+                            and obj.__module__ == module.__name__
+                        ):
+                            plugin = obj()
+                            await plugin.setup()
+                            plugin._is_setup = True
+                            self.register_plugin(plugin)
+                            loaded.append(plugin)
+                except Exception:
+                    # Remove from sys.modules if execution failed
+                    if module_name in sys.modules:
+                        del sys.modules[module_name]
+                    raise
 
             except Exception as e:
                 logger.error(f"Failed to load plugin from {plugin_file}: {e}")
@@ -235,9 +270,10 @@ class PluginManager:
     async def setup_all(self) -> None:
         """Setup all registered plugins."""
         for plugin in self.plugins.values():
-            if plugin.enabled:
+            if plugin.enabled and not getattr(plugin, "_is_setup", False):
                 try:
                     await plugin.setup()
+                    plugin._is_setup = True
                 except Exception as e:
                     logger.error(f"Failed to setup plugin {plugin.name}: {e}")
 
@@ -246,6 +282,7 @@ class PluginManager:
         for plugin in self.plugins.values():
             try:
                 await plugin.teardown()
+                plugin._is_setup = False
             except Exception as e:
                 logger.error(f"Failed to teardown plugin {plugin.name}: {e}")
 

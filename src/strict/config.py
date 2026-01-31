@@ -17,6 +17,10 @@ from pydantic import Field, SecretStr, model_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Default hash for "secret"
+_DEFAULT_ADMIN_HASH = "$2b$12$npx34fPjj96wXPYvVp4Eg.AkSJPSZr6clNxacAt.LiaDWAfzV518m"
+
+
 class StrictSettings(BaseSettings):
     """Application settings loaded from environment variables.
 
@@ -90,6 +94,14 @@ class StrictSettings(BaseSettings):
     valid_api_keys: list[SecretStr] = Field(
         default_factory=list,
         description="List of valid API keys for authentication",
+    )
+    admin_username: str = Field(
+        default="admin",
+        description="Administrator username",
+    )
+    admin_password_hash: str = Field(
+        default="$2b$12$npx34fPjj96wXPYvVp4Eg.AkSJPSZr6clNxacAt.LiaDWAfzV518m",
+        description="Administrator password hash (bcrypt)",
     )
     auth_algorithm: str = Field(
         default="HS256",
@@ -183,6 +195,13 @@ class StrictSettings(BaseSettings):
                 "Set STRICT_DATABASE_URL environment variable."
             )
 
+        # Ensure default admin password hash is not used in production
+        if not self.debug and self.admin_password_hash == _DEFAULT_ADMIN_HASH:
+            raise ValueError(
+                "Default administrator password hash detected. "
+                "You must set a custom STRICT_ADMIN_PASSWORD_HASH in production."
+            )
+
         return self
 
 
@@ -209,7 +228,13 @@ def get_settings() -> StrictSettings:
         # In debug mode, provide helpful development defaults
         import os
 
-        if os.getenv("STRICT_DEBUG_MODE"):
+        if os.getenv("STRICT_DEBUG", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "y",
+            "on",
+        ):
             warnings.warn(
                 "Using DEBUG MODE with insecure defaults - NOT FOR PRODUCTION",
                 stacklevel=2,
