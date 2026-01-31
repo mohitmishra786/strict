@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "rough"
+name = "strict"
 version = "0.1.0"
 description = "High-Integrity Signal Processing Engine with Diamond Gate Protocol"
 readme = "README.md"
@@ -34,25 +34,42 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0.0,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "httpx>=0.24.0",
+    "openai>=1.0.0",
+    "structlog>=23.1.0",
+    "prometheus-fastapi-instrumentator>=6.0.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "redis>=5.0.0",
+    "aioboto3>=12.0.0",
+    "python-jose>=3.3.0",
+    "passlib[bcrypt]>=1.7.0",
+    "python-multipart>=0.0.6",
+    "scipy>=1.10.0",
+    "numpy>=1.24.0",
+    "defusedxml>=0.7.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
     "mypy>=1.0.0",
     "ruff>=0.1.0",
     "hypothesis>=6.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/mohitmishra786/rough"
-Documentation = "https://github.com/mohitmishra786/rough/tree/main/docs"
-Repository = "https://github.com/mohitmishra786/rough"
-Issues = "https://github.com/mohitmishra786/rough/issues"
+Homepage = "https://github.com/mohitmishra786/strict"
+Documentation = "https://github.com/mohitmishra786/strict/tree/main/docs"
+Repository = "https://github.com/mohitmishra786/strict"
+Issues = "https://github.com/mohitmishra786/strict/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/rough"]
+packages = ["src/strict"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -98,10 +115,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["rough"]
+known-first-party = ["strict"]
 
 [tool.coverage.run]
-source = ["src/rough"]
+source = ["src/strict"]
 branch = true
 
 [tool.coverage.report]

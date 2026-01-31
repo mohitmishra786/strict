@@ -35,8 +35,8 @@ See [docs/architecture.md](docs/architecture.md) for detailed documentation with
 
 ```bash
 # Clone the repository
-git clone https://github.com/mohitmishra786/rough.git
-cd rough
+git clone https://github.com/mohitmishra786/strict.git
+cd strict
 
 # Create virtual environment (named bhasha)
 python3.11 -m venv bhasha
@@ -51,8 +51,8 @@ pip install -e .
 ## Quick Start
 
 ```python
-from rough.integrity import SignalConfig, ProcessingRequest
-from rough.core import validate_model_output, calculate_system_success_probability
+from strict.integrity import SignalConfig, ProcessingRequest
+from strict.core import validate_model_output, calculate_system_success_probability
 
 # Create a validated signal configuration
 config = SignalConfig(
@@ -102,7 +102,7 @@ See [docs/setup_guide.md](docs/setup_guide.md) for full configuration options.
 pytest tests/ -v
 
 # Type checking
-mypy src/rough/
+mypy src/strict/
 
 # Linting
 ruff check src/ tests/

@@ -4,7 +4,7 @@ This module handles environment-based configuration using Pydantic Settings.
 All configuration is validated at startup and immutable thereafter.
 
 Usage:
-    from rough.config import settings
+    from strict.config import settings
     print(settings.secret_key)
 """
 
@@ -46,6 +46,54 @@ class StrictSettings(BaseSettings):
     secret_key: SecretStr = Field(
         default=SecretStr(""),
         description="Secret key for cryptographic operations. User to fill.",
+    )
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        description="OpenAI API Key",
+    )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        description="Ollama Base URL",
+    )
+
+    # Persistence Configuration
+    database_url: str = Field(
+        default="postgresql+asyncpg://user:password@localhost/strict_db",
+        description="PostgreSQL Connection URL",
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis Connection URL",
+    )
+    s3_endpoint_url: str | None = Field(
+        default=None,
+        description="S3 Endpoint URL (for MinIO/AWS)",
+    )
+    s3_access_key: SecretStr | None = Field(
+        default=None,
+        description="S3 Access Key",
+    )
+    s3_secret_key: SecretStr | None = Field(
+        default=None,
+        description="S3 Secret Key",
+    )
+    s3_bucket_name: str = Field(
+        default="strict-storage",
+        description="S3 Bucket Name",
+    )
+
+    # Auth Configuration
+    auth_secret_key: SecretStr = Field(
+        default=SecretStr("changeme"),
+        description="Secret key for JWT",
+    )
+    auth_algorithm: str = Field(
+        default="HS256",
+        description="JWT Algorithm",
+    )
+    auth_access_token_expire_minutes: int = Field(
+        default=30,
+        description="Token expiration time",
     )
 
     # Runtime Configuration

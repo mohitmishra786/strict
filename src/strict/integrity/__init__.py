@@ -4,7 +4,7 @@ This module contains the critical Pydantic V2 validation layer.
 All inputs must pass through here before reaching the Core.
 """
 
-from rough.integrity.schemas import (
+from strict.integrity.schemas import (
     SignalConfig,
     ProcessingRequest,
     ValidationResult,
