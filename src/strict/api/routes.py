@@ -18,7 +18,6 @@ from strict.api.security import (
     create_access_token,
     get_current_user,
     verify_password,
-    get_password_hash,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     TokenData,
 )

@@ -48,8 +48,20 @@ def validate(
                 rprint("[red]✗[/red] No data found in CSV")
                 raise typer.Exit(1)
 
-            # Collect all values from all rows
-            values = [float(row.get("value", 0)) for row in parsed]
+            # Collect all values from all rows with validation
+            values = []
+            for idx, row in enumerate(parsed):
+                if "value" not in row or not row.get("value"):
+                    rprint(f"[red]✗[/red] Row {idx}: Missing or empty 'value' field")
+                    raise typer.Exit(1)
+                try:
+                    values.append(float(row["value"]))
+                except (ValueError, TypeError) as e:
+                    rprint(
+                        f"[red]✗[/red] Row {idx}: Invalid value '{row.get('value')}' - {e}"
+                    )
+                    raise typer.Exit(1)
+
             # Use sample_rate from first row (or default to 1000)
             sample_rate = float(parsed[0].get("sample_rate", 1000))
 

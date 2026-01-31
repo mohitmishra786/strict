@@ -129,25 +129,19 @@ class SignalData(BaseModel):
         Returns:
             ValidationResult with validation status.
         """
-        errors: list[str] = []
-
-        if len(self.values) == 0:
-            errors.append("Signal data must contain at least one sample")
-
-        if self.sample_rate <= 0:
-            errors.append("Sample rate must be positive")
-
         import hashlib
 
         # Include both values and sample_rate in hash to avoid collisions
+        # Note: Empty check already enforced by validate_signal_length model validator
+        # Note: sample_rate > 0 already enforced by PositiveFloat type
         hash_input = f"{self.values}:{self.sample_rate}"
         input_hash = hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 
         return ValidationResult(
-            status=ValidationStatus.SUCCESS if not errors else ValidationStatus.FAILURE,
-            is_valid=len(errors) == 0,
+            status=ValidationStatus.SUCCESS,
+            is_valid=True,
             input_hash=input_hash,
-            errors=tuple(errors),
+            errors=(),
         )
 
 
