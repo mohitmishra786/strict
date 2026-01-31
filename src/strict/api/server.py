@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from strict.api.routes import router as api_router
+from strict.api.graphql import graphql_app
 from strict.config import settings
 from strict.observability.logging import configure_logging
 from strict.observability.metrics import configure_metrics
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
     app.include_router(dashboard_router)
+    app.include_router(graphql_app, prefix="/graphql")
 
     return app
 

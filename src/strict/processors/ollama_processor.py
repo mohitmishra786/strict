@@ -1,9 +1,16 @@
 import time
 import json
+from typing import AsyncGenerator
 import httpx
 from strict.config import settings
 from strict.core.interfaces import AsyncProcessor
-from strict.integrity.schemas import ProcessingRequest, OutputSchema, ProcessorType
+from strict.integrity.schemas import (
+    ProcessingRequest,
+    OutputSchema,
+    ProcessorType,
+    ValidationResult,
+    ValidationStatus,
+)
 from strict.processors.base import BaseProcessor
 
 
@@ -31,17 +38,52 @@ class OllamaProcessor(BaseProcessor):
                 )
                 response.raise_for_status()
                 result = response.json().get("response", "")
-            except httpx.HTTPStatusError as e:
-                raise ValueError(
-                    f"Ollama HTTP error: {e.response.status_code} - {e.response.text}"
+            except (
+                httpx.HTTPStatusError,
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                json.JSONDecodeError,
+            ) as e:
+                duration = (time.time() - start_time) * 1000
+                return OutputSchema(
+                    result="",
+                    validation=ValidationResult(
+                        status=ValidationStatus.FAILURE,
+                        is_valid=False,
+                        input_hash="hash_placeholder",
+                        errors=(f"Ollama error: {str(e)}",),
+                        warnings=(),
+                    ),
+                    processor_used=ProcessorType.LOCAL,
+                    processing_time_ms=duration,
+                    retries_attempted=0,
                 )
-            except httpx.TimeoutException as e:
-                raise ValueError(
-                    f"Ollama timeout after {request.timeout_seconds}s: {e}"
-                )
-            except httpx.ConnectError as e:
-                raise ValueError(f"Ollama connection failed: {e}")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Ollama returned invalid JSON: {e}")
 
         return await self._create_output(result, ProcessorType.LOCAL, start_time)
+
+    async def stream_process(
+        self, request: ProcessingRequest
+    ) -> AsyncGenerator[str, None]:
+        """Stream processing using Ollama."""
+        async with httpx.AsyncClient() as client:
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/api/generate",
+                    json={
+                        "model": self.model,
+                        "prompt": request.input_data,
+                        "stream": True,
+                    },
+                    timeout=request.timeout_seconds,
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        data = json.loads(line)
+                        if "response" in data:
+                            yield data["response"]
+                        if data.get("done"):
+                            break
+            except Exception:
+                yield "Error during streaming"
