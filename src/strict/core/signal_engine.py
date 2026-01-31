@@ -19,6 +19,66 @@ class SignalEngine:
         pass
 
     @staticmethod
+    def generate_signal(config: SignalConfig) -> list[float]:
+        """Generate a signal based on configuration.
+
+        Args:
+            config: Signal configuration.
+
+        Returns:
+            Generated signal sample values.
+        """
+        t = np.linspace(
+            0,
+            config.duration,
+            int(config.duration * config.sampling_rate),
+            endpoint=False,
+        )
+        values = config.amplitude * np.sin(2 * np.pi * config.frequency * t)
+        return values.tolist()
+
+    @staticmethod
+    def compute_fft(
+        values: list[float] | NDArray, sample_rate: float
+    ) -> tuple[NDArray, NDArray]:
+        """Compute FFT magnitude and frequency bins.
+
+        Args:
+            values: Signal values.
+            sample_rate: Sampling rate in Hz.
+
+        Returns:
+            Tuple of (frequencies, magnitudes).
+        """
+        data = np.array(values)
+        n = len(data)
+        freq = np.fft.rfftfreq(n, d=1 / sample_rate)
+        mag = np.abs(np.fft.rfft(data)) / n
+        return freq, mag
+
+    @staticmethod
+    def apply_lowpass_filter(
+        values: list[float] | NDArray, cutoff: float, fs: float, order: int = 5
+    ) -> list[float]:
+        """Apply lowpass filter to raw values.
+
+        Args:
+            values: Signal values.
+            cutoff: Cutoff frequency in Hz.
+            fs: Sampling rate in Hz.
+            order: Filter order.
+
+        Returns:
+            Filtered values as list.
+        """
+        data = np.array(values)
+        nyquist = 0.5 * fs
+        normal_cutoff = cutoff / nyquist
+        b, a = signal.butter(order, normal_cutoff, btype="low", analog=False)
+        y = signal.lfilter(b, a, data)
+        return y.tolist()
+
+    @staticmethod
     def fft(signal_data: SignalData) -> SignalData:
         """Compute FFT of the signal data.
 

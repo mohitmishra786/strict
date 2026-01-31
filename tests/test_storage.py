@@ -14,10 +14,10 @@ async def test_cache_get_set():
 
         # Test Set
         await cache.set("key", "value")
-        mock_redis.set.assert_called_with("key", "value", ex=3600)
+        mock_redis.set.assert_called_with("key", '"value"', ex=3600)
 
         # Test Get
-        mock_redis.get.return_value = "value"
+        mock_redis.get.return_value = '"value"'
         val = await cache.get("key")
         assert val == "value"
 
