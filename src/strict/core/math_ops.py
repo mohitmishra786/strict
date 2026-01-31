@@ -37,7 +37,7 @@ class MathEngine:
         Raises:
             ValueError: If values list is empty.
         """
-        if not values:
+        if len(values) == 0:
             raise ValueError("Cannot calculate mean of empty list")
         arr = np.array(values)
         return float(np.mean(arr))
@@ -54,7 +54,7 @@ class MathEngine:
         Raises:
             ValueError: If values list is empty.
         """
-        if not values:
+        if len(values) == 0:
             raise ValueError("Cannot calculate median of empty list")
         arr = np.array(values)
         return float(np.median(arr))
@@ -105,7 +105,7 @@ class MathEngine:
         Raises:
             ValueError: If values list is empty.
         """
-        if not values:
+        if len(values) == 0:
             raise ValueError("Cannot calculate min of empty list")
         arr = np.array(values)
         return float(np.min(arr))
@@ -122,7 +122,7 @@ class MathEngine:
         Raises:
             ValueError: If values list is empty.
         """
-        if not values:
+        if len(values) == 0:
             raise ValueError("Cannot calculate max of empty list")
         arr = np.array(values)
         return float(np.max(arr))
@@ -139,7 +139,7 @@ class MathEngine:
         Raises:
             ValueError: If values list is empty.
         """
-        if not values:
+        if len(values) == 0:
             raise ValueError("Cannot calculate sum of empty list")
         arr = np.array(values)
         return float(np.sum(arr))
@@ -156,10 +156,12 @@ class MathEngine:
         Raises:
             ValueError: If values list is empty.
         """
-        if not values:
+        if len(values) == 0:
             raise ValueError("Cannot calculate product of empty list")
-        arr = np.array(values)
-        return float(np.prod(arr))
+        result = 1.0
+        for v in values:
+            result *= v
+        return float(result)
 
     def add(self, values: list[float] | NDArray[np.float64]) -> float:
         """Add all values together (alias for sum).
@@ -189,6 +191,47 @@ class MathEngine:
         result = values[0]
         for v in values[1:]:
             result -= v
+        return float(result)
+
+    def multiply(self, values: list[float] | NDArray[np.float64]) -> float:
+        """Multiply all values together.
+
+        Args:
+            values: List or array of numeric values.
+
+        Returns:
+            The product.
+
+        Raises:
+            ValueError: If values list is empty.
+        """
+        if len(values) == 0:
+            raise ValueError("Cannot multiply empty list")
+        result = 1.0
+        for v in values:
+            result *= v
+        return float(result)
+
+    def divide(self, values: list[float] | NDArray[np.float64]) -> float:
+        """Divide all values sequentially from left to right.
+
+        Args:
+            values: List or array of numeric values.
+
+        Returns:
+            The result of sequential division.
+
+        Raises:
+            ValueError: If values list has fewer than 2 elements.
+            ZeroDivisionError: If any division by zero occurs.
+        """
+        if len(values) < 2:
+            raise ValueError("Divide requires at least 2 values")
+        result = values[0]
+        for v in values[1:]:
+            if v == 0:
+                raise ZeroDivisionError("Division by zero")
+            result /= v
         return float(result)
 
     def multiply(self, values: list[float] | NDArray[np.float64]) -> float:

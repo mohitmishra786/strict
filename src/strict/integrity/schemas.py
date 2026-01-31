@@ -139,7 +139,9 @@ class SignalData(BaseModel):
 
         import hashlib
 
-        input_hash = hashlib.sha256(str(self.values).encode()).hexdigest()[:16]
+        # Include both values and sample_rate in hash to avoid collisions
+        hash_input = f"{self.values}:{self.sample_rate}"
+        input_hash = hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 
         return ValidationResult(
             status=ValidationStatus.SUCCESS if not errors else ValidationStatus.FAILURE,
