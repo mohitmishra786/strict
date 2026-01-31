@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 from strict.config import settings
 
@@ -28,11 +28,13 @@ class TokenData(BaseModel):
     username: str | None = None
 
 
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain password against a hashed password."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
+    """Hash a password using bcrypt."""
     return pwd_context.hash(password)
 
 
@@ -59,21 +61,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
+    except JWTError as e:
+        raise credentials_exception from e
     return token_data
 
 
-async def verify_api_key(api_key: str = Depends(api_key_header)):
-    """Verify API Key."""
-    # In a real app, check against DB or secret setting
-    # For now, simple check against a hardcoded value or env
+async def verify_api_key(api_key: Optional[str] = Depends(api_key_header)):
+    """Verify API Key against configured valid keys."""
     if not api_key:
-        return None  # Proceed to check other auth methods or fail
+        return None
 
-    # Example: Check if it matches secret_key (not recommended for prod but ok for prototype)
-    # Better: Use a separate valid_api_keys list in config
-    if api_key == settings.secret_key.get_secret_value():
+    # Check against configured valid API keys
+    valid_keys = [key.get_secret_value() for key in settings.valid_api_keys]
+    if api_key in valid_keys:
         return TokenData(username="api_key_user")
 
     raise HTTPException(
@@ -83,13 +83,10 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
 
 
 async def get_current_user_or_apikey(
-    token_user: TokenData | None = Depends(lambda: None),  # Placeholder for OAuth
-    api_key_user: TokenData | None = Depends(verify_api_key),
+    token_user: TokenData = Depends(get_current_user),
+    api_key_user: Optional[TokenData] = Depends(verify_api_key),
 ):
-    """Allow either OAuth2 or API Key."""
+    """Allow either OAuth2 or API Key authentication."""
     if api_key_user:
         return api_key_user
-    # If no API key, try OAuth (needs proper chaining, simpler to just rely on Depends logic in route)
-    # This is a bit complex to combine cleanly in one dependency without creating custom class
-    # For simplicity, we'll enforce OAuth on routes, or API Key on routes.
-    pass
+    return token_user

@@ -30,13 +30,28 @@ def create_app() -> FastAPI:
 
     configure_metrics(app)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # Configure CORS
+    # In production with credentials, use specific origins
+    # For development, allow all origins without credentials
+    allowed_origins = ["http://localhost:3000", "http://localhost:8000"]
+    if settings.debug:
+        # Development: allow all origins but no credentials
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        # Production: specific origins with credentials if needed
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     app.include_router(api_router)
     app.include_router(dashboard_router)

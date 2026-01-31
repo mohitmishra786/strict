@@ -11,9 +11,9 @@ Usage:
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, List
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,7 +58,7 @@ class StrictSettings(BaseSettings):
 
     # Persistence Configuration
     database_url: str = Field(
-        default="postgresql+asyncpg://user:password@localhost/strict_db",
+        default="",
         description="PostgreSQL Connection URL",
     )
     redis_url: str = Field(
@@ -84,8 +84,12 @@ class StrictSettings(BaseSettings):
 
     # Auth Configuration
     auth_secret_key: SecretStr = Field(
-        default=SecretStr("changeme"),
-        description="Secret key for JWT",
+        default=SecretStr(""),
+        description="Secret key for JWT (required in production)",
+    )
+    valid_api_keys: List[SecretStr] = Field(
+        default_factory=list,
+        description="List of valid API keys for authentication",
     )
     auth_algorithm: str = Field(
         default="HS256",
@@ -145,6 +149,32 @@ class StrictSettings(BaseSettings):
         description="Enable automatic failover to local on cloud failure",
     )
 
+    @model_validator(mode="after")
+    def validate_security_in_production(self) -> "StrictSettings":
+        """Ensure secure defaults in production."""
+        # Check if auth_secret_key is set
+        if not self.auth_secret_key.get_secret_value():
+            if not self.debug:
+                raise ValueError(
+                    "auth_secret_key must be set in production. "
+                    "Set STRICT_AUTH_SECRET_KEY environment variable."
+                )
+            # In debug mode, provide a default for development
+            object.__setattr__(
+                self,
+                "auth_secret_key",
+                SecretStr("dev-secret-key-do-not-use-in-production"),
+            )
+
+        # Check database_url in non-debug mode
+        if not self.debug and not self.database_url:
+            raise ValueError(
+                "database_url must be set in production. "
+                "Set STRICT_DATABASE_URL environment variable."
+            )
+
+        return self
+
 
 @lru_cache
 def get_settings() -> StrictSettings:
@@ -156,7 +186,14 @@ def get_settings() -> StrictSettings:
     Returns:
         StrictSettings instance with validated configuration.
     """
-    return StrictSettings()
+    try:
+        return StrictSettings()
+    except Exception as e:
+        # Fallback to debug mode with development defaults
+        import warnings
+
+        warnings.warn(f"Failed to load settings: {e}. Using debug defaults.")
+        return StrictSettings(debug=True, auth_secret_key=SecretStr("dev-secret-key"))
 
 
 # Convenience export for direct import

@@ -17,6 +17,8 @@ from strict.api.security import (
     Token,
     create_access_token,
     get_current_user,
+    verify_password,
+    get_password_hash,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     TokenData,
 )
@@ -24,13 +26,23 @@ from strict.api.security import (
 router = APIRouter()
 processor_manager = ProcessorManager()
 
+# Simple in-memory user database (in production, use a real database)
+USERS_DB = {
+    "admin": {
+        "username": "admin",
+        # Hash of "secret" - Use: get_password_hash("secret") to generate
+        "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj9SjKEq7mWq",
+    }
+}
+
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
-    # Verify user (dummy check for now)
-    if form_data.username != "admin" or form_data.password != "secret":
+    """Authenticate user and return access token."""
+    user = USERS_DB.get(form_data.username)
+    if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -103,6 +115,8 @@ async def process_request(
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors()
-        )
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e

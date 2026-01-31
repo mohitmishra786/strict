@@ -18,19 +18,16 @@ class OllamaProcessor(BaseProcessor):
         start_time = time.time()
 
         async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.base_url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": request.input_data,
-                        "stream": False,
-                    },
-                    timeout=request.timeout_seconds,
-                )
-                response.raise_for_status()
-                result = response.json().get("response", "")
-            except Exception as e:
-                result = f"Error calling Ollama: {str(e)}"
+            response = await client.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": request.input_data,
+                    "stream": False,
+                },
+                timeout=request.timeout_seconds,
+            )
+            response.raise_for_status()
+            result = response.json().get("response", "")
 
         return await self._create_output(result, ProcessorType.LOCAL, start_time)

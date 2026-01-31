@@ -3,6 +3,8 @@
 Provides a simple web interface for monitoring and interacting with Strict.
 """
 
+from pathlib import Path
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -11,7 +13,9 @@ from strict.config import get_settings
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-templates = Jinja2Templates(directory="src/strict/dashboard/templates")
+# Compute templates directory relative to this module
+templates_dir = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)

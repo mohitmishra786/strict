@@ -6,13 +6,15 @@ with support for TTL, cache invalidation, and statistics.
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import hashlib
 import json
 import logging
+import threading
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
-from strict.storage.cache import cache
+from strict.storage.cache import get_cache
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -20,6 +22,51 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+class CacheStats:
+    """Cache statistics tracker with thread-safety."""
+
+    def __init__(self) -> None:
+        """Initialize cache stats with lock for thread safety."""
+        self._lock = threading.Lock()
+        self.hits: int = 0
+        self.misses: int = 0
+        self.errors: int = 0
+
+    def record_hit(self) -> None:
+        """Record a cache hit."""
+        with self._lock:
+            self.hits += 1
+
+    def record_miss(self) -> None:
+        """Record a cache miss."""
+        with self._lock:
+            self.misses += 1
+
+    def record_error(self) -> None:
+        """Record a cache error."""
+        with self._lock:
+            self.errors += 1
+
+    @property
+    def hit_rate(self) -> float:
+        """Calculate cache hit rate."""
+        total = self.hits + self.misses
+        return self.hits / total if total > 0 else 0.0
+
+    def to_dict(self) -> dict[str, int | float]:
+        """Convert stats to dictionary."""
+        return {
+            "hits": self.hits,
+            "misses": self.misses,
+            "errors": self.errors,
+            "hit_rate": self.hit_rate,
+        }
+
+
+# Global cache stats instance
+cache_stats = CacheStats()
 
 
 def _generate_cache_key(
@@ -86,21 +133,24 @@ def cached(
 
             try:
                 # Try to get from cache
-                cached_value = await cache.get(cache_key)
+                cached_value = await get_cache().get(cache_key)
                 if cached_value is not None:
                     logger.debug(f"Cache hit for key: {cache_key}")
+                    cache_stats.record_hit()
                     return cached_value
 
                 # Cache miss - call the function
                 logger.debug(f"Cache miss for key: {cache_key}")
+                cache_stats.record_miss()
                 result = await func(*args, **kwargs)
 
                 # Store in cache
-                await cache.set(cache_key, result, ttl)
+                await get_cache().set(cache_key, result, ttl)
                 return result
 
             except Exception as e:
                 logger.warning(f"Cache error: {e}, falling back to function call")
+                cache_stats.record_error()
                 return await func(*args, **kwargs)
 
         @functools.wraps(func)
@@ -114,25 +164,25 @@ def cached(
 
             try:
                 # Try to get from cache (synchronous)
-                import asyncio
-
-                loop = asyncio.get_event_loop()
-                cached_value = loop.run_until_complete(cache.get(cache_key))
+                cached_value = asyncio.run(get_cache().get(cache_key))
 
                 if cached_value is not None:
                     logger.debug(f"Cache hit for key: {cache_key}")
+                    cache_stats.record_hit()
                     return cached_value
 
                 # Cache miss - call the function
                 logger.debug(f"Cache miss for key: {cache_key}")
+                cache_stats.record_miss()
                 result = func(*args, **kwargs)
 
                 # Store in cache
-                loop.run_until_complete(cache.set(cache_key, result, ttl))
+                asyncio.run(get_cache().set(cache_key, result, ttl))
                 return result
 
             except Exception as e:
                 logger.warning(f"Cache error: {e}, falling back to function call")
+                cache_stats.record_error()
                 return func(*args, **kwargs)
 
         # Return appropriate wrapper based on whether function is async
@@ -142,9 +192,6 @@ def cached(
             return sync_wrapper  # type: ignore
 
     return decorator
-
-
-import asyncio
 
 
 def cache_result(
@@ -167,31 +214,36 @@ def cache_result(
         @functools.wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> T:
             try:
-                cached_value = await cache.get(cache_key)
+                cached_value = await get_cache().get(cache_key)
                 if cached_value is not None:
+                    cache_stats.record_hit()
                     return cached_value
 
                 result = await func(*args, **kwargs)
-                await cache.set(cache_key, result, ttl)
+                cache_stats.record_miss()
+                await get_cache().set(cache_key, result, ttl)
                 return result
 
             except Exception:
+                cache_stats.record_error()
                 return await func(*args, **kwargs)
 
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             try:
-                loop = asyncio.get_event_loop()
-                cached_value = loop.run_until_complete(cache.get(cache_key))
+                cached_value = asyncio.run(get_cache().get(cache_key))
 
                 if cached_value is not None:
+                    cache_stats.record_hit()
                     return cached_value
 
                 result = func(*args, **kwargs)
-                loop.run_until_complete(cache.set(cache_key, result, ttl))
+                cache_stats.record_miss()
+                asyncio.run(get_cache().set(cache_key, result, ttl))
                 return result
 
             except Exception:
+                cache_stats.record_error()
                 return func(*args, **kwargs)
 
         if asyncio.iscoroutinefunction(func):

@@ -48,11 +48,12 @@ def validate(
                 rprint("[red]✗[/red] No data found in CSV")
                 raise typer.Exit(1)
 
-            first_row = parsed[0]
-            signal_data = SignalData(
-                values=[float(first_row.get("value", 0))],
-                sample_rate=float(first_row.get("sample_rate", 1000)),
-            )
+            # Collect all values from all rows
+            values = [float(row.get("value", 0)) for row in parsed]
+            # Use sample_rate from first row (or default to 1000)
+            sample_rate = float(parsed[0].get("sample_rate", 1000))
+
+            signal_data = SignalData(values=values, sample_rate=sample_rate)
         else:
             rprint(f"[red]✗[/red] Unsupported format: {format_type}")
             raise typer.Exit(1)
@@ -222,7 +223,7 @@ def config() -> None:
 
 @app.command()
 def server(
-    host: str = typer.Option("0.0.0.0", "--host", "-H", help="Host to bind to"),
+    host: str = typer.Option("127.0.0.1", "--host", "-H", help="Host to bind to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
     reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload"),
 ) -> None:

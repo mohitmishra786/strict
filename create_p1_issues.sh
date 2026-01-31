@@ -1,12 +1,19 @@
 #!/bin/bash
+set -euo pipefail
 
 # Script to create P1 (HIGH) issues
 # These are important but not blocking
 
+# Check if gh CLI is available and authenticated
+if ! gh auth status &>/dev/null; then
+    echo "Error: gh CLI not authenticated. Run 'gh auth login' first."
+    exit 1
+fi
+
 echo "Creating P1 (HIGH) issues..."
 
 # Issue 6: Add Persistence Layer
-gh issue create --title "Add Persistence Layer (PostgreSQL, Redis, S3)" --label "enhancement" --label "help wanted" --label "good first issue" --body "**Problem:**
+gh issue create --title "Add Persistence Layer (PostgreSQL, Redis, S3)" --label "enhancement" --label "help wanted" --body "**Problem:**
 No storage beyond memory - data not persisted
 
 **Current State:**

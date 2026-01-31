@@ -8,7 +8,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -258,7 +258,7 @@ class ConfigurationError(StrictError):
         )
 
 
-def handle_pydantic_validation_error(error: ValidationError) -> ValidationError:
+def handle_pydantic_validation_error(error: PydanticValidationError) -> ValidationError:
     """Convert Pydantic ValidationError to Strict ValidationError.
 
     Args:
