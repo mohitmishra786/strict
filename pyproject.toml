@@ -50,6 +50,8 @@ dependencies = [
     "scipy>=1.10.0",
     "numpy>=1.24.0",
     "defusedxml>=0.7.1",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
@@ -67,6 +69,9 @@ Homepage = "https://github.com/mohitmishra786/strict"
 Documentation = "https://github.com/mohitmishra786/strict/tree/main/docs"
 Repository = "https://github.com/mohitmishra786/strict"
 Issues = "https://github.com/mohitmishra786/strict/issues"
+
+[project.scripts]
+strict = "strict.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/strict"]
