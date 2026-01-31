@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from openai import AsyncOpenAI, APIError
 from strict.config import settings
@@ -23,6 +23,9 @@ class OpenAIProcessor(BaseProcessor):
             if settings.openai_api_key
             else None
         )
+        if not api_key:
+            # Fallback for development/testing
+            api_key = "dummy-key"
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = "gpt-4o-mini"  # Default model
 
@@ -43,7 +46,7 @@ class OpenAIProcessor(BaseProcessor):
             )
             response = await client_with_timeout.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=messages,  # type: ignore
             )
             result = response.choices[0].message.content or ""
         except APIError as e:
@@ -64,3 +67,24 @@ class OpenAIProcessor(BaseProcessor):
             )
 
         return await self._create_output(result, ProcessorType.CLOUD, start_time)
+
+    async def stream_process(
+        self, request: ProcessingRequest
+    ) -> AsyncGenerator[str, None]:
+        """Stream processing using OpenAI."""
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": request.input_data},
+        ]
+
+        try:
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,  # type: ignore
+                stream=True,
+            )
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception:
+            yield "Error during streaming"

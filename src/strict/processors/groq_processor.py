@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from groq import AsyncGroq, APIError
 from strict.config import settings
@@ -21,6 +21,9 @@ class GroqProcessor(BaseProcessor):
         api_key = (
             settings.groq_api_key.get_secret_value() if settings.groq_api_key else None
         )
+        if not api_key:
+            # Fallback for development/testing
+            api_key = "dummy-key"
         self.client = AsyncGroq(api_key=api_key)
         self.model = "llama-3.3-70b-versatile"  # Default model
 
@@ -62,3 +65,27 @@ class GroqProcessor(BaseProcessor):
             )
 
         return await self._create_output(result, ProcessorType.CLOUD, start_time)
+
+    async def stream_process(
+        self, request: ProcessingRequest
+    ) -> AsyncGenerator[str, None]:
+        """Stream processing using Groq."""
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a high-integrity processing engine.",
+            },
+            {"role": "user", "content": request.input_data},
+        ]
+
+        try:
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=True,
+            )
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception:
+            yield "Error during streaming"

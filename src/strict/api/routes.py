@@ -1,12 +1,22 @@
+from __future__ import annotations
 from typing import Annotated, Any
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    status,
+    Depends,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import ValidationError
 
-from strict.integrity.schemas import ValidationResult
+from strict.integrity.schemas import ValidationResult, ProcessingRequest
 from strict.processors.manager import ProcessorManager
+from strict.api.ws import manager
+
 from strict.api.schemas import (
     ProcessingRequestDTO,
     SignalConfigDTO,
@@ -115,3 +125,38 @@ async def process_request(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         ) from e
+
+
+@router.websocket("/ws/stream")
+async def websocket_stream(websocket: WebSocket):
+    """WebSocket for real-time streaming processing."""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Receive processing request as JSON
+            data = await websocket.receive_json()
+
+            try:
+                # Basic validation using DTO (simplified for WS)
+                dto = ProcessingRequestDTO(**data)
+                request = dto.to_domain()
+
+                # Get appropriate processor
+                processor = await processor_manager.get_processor(request)
+
+                # Stream results back
+
+                async for chunk in processor.stream_process(request):
+                    await websocket.send_json({"type": "chunk", "content": chunk})
+
+                await websocket.send_json({"type": "done", "content": ""})
+
+            except ValidationError as e:
+                await websocket.send_json({"type": "error", "content": str(e)})
+            except Exception as e:
+                await websocket.send_json(
+                    {"type": "error", "content": f"Internal error: {str(e)}"}
+                )
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
