@@ -30,6 +30,7 @@ class Plugin(ABC):
         self.version = "1.0.0"
         self.description = "Base plugin"
         self.enabled: bool = True
+        self._is_setup: bool = False
 
     @abstractmethod
     async def setup(self) -> None:
@@ -193,8 +194,15 @@ class PluginManager:
                 logger.error(f"{class_name} is not a subclass of Plugin")
                 return None
 
+            if inspect.isabstract(plugin_class):
+                logger.error(
+                    f"{class_name} is an abstract class and cannot be instantiated"
+                )
+                return None
+
             plugin = plugin_class()
             await plugin.setup()
+            plugin._is_setup = True
             self.register_plugin(plugin)
 
             return plugin
@@ -213,11 +221,12 @@ class PluginManager:
             List of loaded plugins.
         """
         import importlib.util
+        import sys
 
         loaded = []
 
         for plugin_file in directory.glob("*_plugin.py"):
-            module_name = f"plugin_{plugin_file.stem}"
+            module_name = f"strict_plugins.{plugin_file.stem}"
 
             try:
                 spec = importlib.util.spec_from_file_location(module_name, plugin_file)
@@ -225,14 +234,28 @@ class PluginManager:
                     continue
 
                 module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
+                # Register in sys.modules to support relative imports
+                sys.modules[module_name] = module
 
-                for _, obj in inspect.getmembers(module, inspect.isclass):
-                    if issubclass(obj, Plugin) and obj is not Plugin:
-                        plugin = obj()
-                        await plugin.setup()
-                        self.register_plugin(plugin)
-                        loaded.append(plugin)
+                try:
+                    spec.loader.exec_module(module)
+
+                    for _, obj in inspect.getmembers(module, inspect.isclass):
+                        if (
+                            issubclass(obj, Plugin)
+                            and obj is not Plugin
+                            and not inspect.isabstract(obj)
+                        ):
+                            plugin = obj()
+                            await plugin.setup()
+                            plugin._is_setup = True
+                            self.register_plugin(plugin)
+                            loaded.append(plugin)
+                except Exception:
+                    # Remove from sys.modules if execution failed
+                    if module_name in sys.modules:
+                        del sys.modules[module_name]
+                    raise
 
             except Exception as e:
                 logger.error(f"Failed to load plugin from {plugin_file}: {e}")
@@ -242,9 +265,10 @@ class PluginManager:
     async def setup_all(self) -> None:
         """Setup all registered plugins."""
         for plugin in self.plugins.values():
-            if plugin.enabled:
+            if plugin.enabled and not getattr(plugin, "_is_setup", False):
                 try:
                     await plugin.setup()
+                    plugin._is_setup = True
                 except Exception as e:
                     logger.error(f"Failed to setup plugin {plugin.name}: {e}")
 

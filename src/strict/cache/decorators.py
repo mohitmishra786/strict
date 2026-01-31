@@ -13,7 +13,6 @@ import json
 import logging
 import threading
 import atexit
-import json
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 from concurrent.futures import ThreadPoolExecutor
 from redis.exceptions import RedisError

@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from strict.cache import cached, cache_result, cache_stats
-from strict.storage.cache import get_cache
 
 
 @pytest.fixture(autouse=True)

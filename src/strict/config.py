@@ -17,6 +17,10 @@ from pydantic import Field, SecretStr, model_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Default hash for "secret"
+_DEFAULT_ADMIN_HASH = "$2b$12$npx34fPjj96wXPYvVp4Eg.AkSJPSZr6clNxacAt.LiaDWAfzV518m"
+
+
 class StrictSettings(BaseSettings):
     """Application settings loaded from environment variables.
 
@@ -191,6 +195,13 @@ class StrictSettings(BaseSettings):
                 "Set STRICT_DATABASE_URL environment variable."
             )
 
+        # Ensure default admin password hash is not used in production
+        if not self.debug and self.admin_password_hash == _DEFAULT_ADMIN_HASH:
+            raise ValueError(
+                "Default administrator password hash detected. "
+                "You must set a custom STRICT_ADMIN_PASSWORD_HASH in production."
+            )
+
         return self
 
 
@@ -222,13 +233,6 @@ def get_settings() -> StrictSettings:
                 "Using DEBUG MODE with insecure defaults - NOT FOR PRODUCTION",
                 stacklevel=2,
             )
-            return StrictSettings(
-                debug=True,
-                auth_secret_key=SecretStr("dev-secret-key-do-not-use-in-production"),
-                database_url="",
-                redis_url="redis://localhost:6379/0",
-            )
-
             return StrictSettings(
                 debug=True,
                 auth_secret_key=SecretStr("dev-secret-key-do-not-use-in-production"),
