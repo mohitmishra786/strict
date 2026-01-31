@@ -193,6 +193,62 @@ def validate_token_processor_compatibility(
     return (True, "")
 
 
+def validate_feature_value(value: Any, schema: Any) -> tuple[bool, str]:
+    """Validate a single feature value against its schema.
+
+    Args:
+        value: The value to validate.
+        schema: The FeatureSchema to validate against.
+
+    Returns:
+        Tuple of (is_valid, error_message).
+    """
+    if value is None:
+        if schema.required:
+            return False, f"Feature '{schema.name}' is required"
+        return True, ""
+
+    if schema.feature_type == "numeric":
+        if not isinstance(value, (int, float)):
+            return (
+                False,
+                f"Feature '{schema.name}' must be numeric, got {type(value).__name__}",
+            )
+        if schema.min_value is not None and value < schema.min_value:
+            return (
+                False,
+                f"Feature '{schema.name}' value {value} < min_value {schema.min_value}",
+            )
+        if schema.max_value is not None and value > schema.max_value:
+            return (
+                False,
+                f"Feature '{schema.name}' value {value} > max_value {schema.max_value}",
+            )
+
+    elif schema.feature_type == "categorical":
+        if schema.allowed_values is not None and value not in schema.allowed_values:
+            return (
+                False,
+                f"Feature '{schema.name}' value '{value}' not in allowed_values {schema.allowed_values}",
+            )
+
+    elif schema.feature_type == "boolean":
+        if not isinstance(value, bool):
+            return (
+                False,
+                f"Feature '{schema.name}' must be boolean, got {type(value).__name__}",
+            )
+
+    elif schema.feature_type == "text":
+        if not isinstance(value, str):
+            return (
+                False,
+                f"Feature '{schema.name}' must be string, got {type(value).__name__}",
+            )
+
+    return True, ""
+
+
 # -----------------------------------------------------------------------------
 # Error Collection
 # -----------------------------------------------------------------------------

@@ -70,7 +70,7 @@ def validate(
             rprint(f"[red]✗[/red] Unsupported format: {format_type}")
             raise typer.Exit(1)
 
-        result = signal_data.validate()
+        result = signal_data.validate_integrity()
         if result.is_valid:
             rprint("[green]✓[/green] Signal data is valid")
             rprint(f"  Samples: {len(signal_data.values)}")

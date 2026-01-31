@@ -100,9 +100,105 @@ class ValidationStatus(str, Enum):
     PARTIAL = "partial"
 
 
+class FeatureType(str, Enum):
+    """Type of feature in an ML model."""
+
+    NUMERIC = "numeric"
+    CATEGORICAL = "categorical"
+    BOOLEAN = "boolean"
+    TEXT = "text"
+
+
 # -----------------------------------------------------------------------------
 # Immutable Models
 # -----------------------------------------------------------------------------
+
+
+class FeatureSchema(BaseModel):
+    """Schema for an ML model feature."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    feature_type: FeatureType
+    description: str | None = None
+    required: bool = True
+    min_value: float | None = None
+    max_value: float | None = None
+    allowed_values: tuple[Any, ...] | None = None
+
+
+class MLModelConfig(BaseModel):
+    """Configuration for an ML model."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
+    features: tuple[FeatureSchema, ...]
+    performance_threshold: Probability = Field(default=0.8)
+    current_performance: Probability | None = None
+    last_evaluated: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MLModelValidationRequest(BaseModel):
+    """Request for ML model input validation."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    model_info: MLModelConfig
+    input_features: dict[str, Any]
+
+    def validate_inputs(self) -> ValidationResult:
+        """Validate input features against the model schema.
+
+        Returns:
+            ValidationResult with any errors found.
+        """
+        from strict.integrity.validators import (
+            validate_feature_value,
+            compute_input_hash,
+        )
+        import json
+
+        errors = []
+        # Check if all required features are present
+        schema_features = {f.name: f for f in self.model_info.features}
+
+        # Check for missing required features
+        for name, schema in schema_features.items():
+            if schema.required and name not in self.input_features:
+                errors.append(f"Missing required feature: {name}")
+
+        # Validate provided features
+        for name, value in self.input_features.items():
+            if name not in schema_features:
+                # Optional: Handle extra features? For strictness, we might reject them.
+                # errors.append(f"Unknown feature: {name}")
+                continue
+
+            is_valid, error_msg = validate_feature_value(value, schema_features[name])
+            if not is_valid:
+                errors.append(error_msg)
+
+        input_hash = compute_input_hash(
+            json.dumps(self.input_features, sort_keys=True)
+        )[:16]
+
+        if errors:
+            return ValidationResult(
+                status=ValidationStatus.FAILURE,
+                is_valid=False,
+                input_hash=input_hash,
+                errors=tuple(errors),
+            )
+
+        return ValidationResult(
+            status=ValidationStatus.SUCCESS,
+            is_valid=True,
+            input_hash=input_hash,
+        )
 
 
 class SignalData(BaseModel):
@@ -123,7 +219,7 @@ class SignalData(BaseModel):
             raise ValueError("Signal data must contain at least one sample")
         return self
 
-    def validate(self) -> ValidationResult:
+    def validate_integrity(self) -> ValidationResult:
         """Validate the signal data.
 
         Returns:

@@ -55,6 +55,10 @@ class StrictSettings(BaseSettings):
         default=None,
         description="OpenAI API Key",
     )
+    groq_api_key: SecretStr | None = Field(
+        default=None,
+        description="Groq API Key",
+    )
     ollama_base_url: str = Field(
         default="http://localhost:11434",
         description="Ollama Base URL",
