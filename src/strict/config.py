@@ -11,9 +11,9 @@ Usage:
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated, List
+from typing import Annotated
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -87,7 +87,7 @@ class StrictSettings(BaseSettings):
         default=SecretStr(""),
         description="Secret key for JWT (required in production)",
     )
-    valid_api_keys: List[SecretStr] = Field(
+    valid_api_keys: list[SecretStr] = Field(
         default_factory=list,
         description="List of valid API keys for authentication",
     )
@@ -98,6 +98,16 @@ class StrictSettings(BaseSettings):
     auth_access_token_expire_minutes: int = Field(
         default=30,
         description="Token expiration time",
+    )
+
+    # CORS Configuration
+    cors_allowed_origins: list[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8000"],
+        description="Allowed CORS origins for production",
+    )
+    cors_allow_credentials: bool = Field(
+        default=False,
+        description="Allow credentials in CORS requests",
     )
 
     # Runtime Configuration
@@ -188,12 +198,39 @@ def get_settings() -> StrictSettings:
     """
     try:
         return StrictSettings()
-    except Exception as e:
-        # Fallback to debug mode with development defaults
+    except ValidationError as e:
+        # Configuration validation failed - this is critical
         import warnings
+        import sys
 
-        warnings.warn(f"Failed to load settings: {e}. Using debug defaults.")
-        return StrictSettings(debug=True, auth_secret_key=SecretStr("dev-secret-key"))
+        error_msg = f"Configuration validation failed: {e}"
+        warnings.warn(error_msg, stacklevel=2)
+
+        # In debug mode, provide helpful development defaults
+        import os
+
+        if os.getenv("STRICT_DEBUG_MODE"):
+            warnings.warn(
+                "Using DEBUG MODE with insecure defaults - NOT FOR PRODUCTION",
+                stacklevel=2,
+            )
+            return StrictSettings(
+                debug=True,
+                auth_secret_key=SecretStr("dev-secret-key-do-not-use-in-production"),
+                database_url="",
+                redis_url="redis://localhost:6379/0",
+            )
+
+        # In production, fail fast
+        sys.exit(1)
+    except Exception as e:
+        # Unexpected error - log details and exit
+        import warnings
+        import sys
+
+        error_msg = f"Failed to load settings: {type(e).__name__}: {e}"
+        warnings.warn(error_msg, stacklevel=2)
+        sys.exit(1)
 
 
 # Convenience export for direct import

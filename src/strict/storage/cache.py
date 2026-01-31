@@ -1,6 +1,7 @@
 from typing import Any
 import json
 import redis.asyncio as redis
+import threading
 from strict.config import settings
 
 
@@ -33,13 +34,17 @@ class CacheManager:
         await self.redis.close()
 
 
-# Lazy initialization
+# Thread-safe lazy initialization
 _cache: CacheManager | None = None
+_cache_lock = threading.Lock()
 
 
 def get_cache() -> CacheManager:
-    """Get or create the cache manager singleton."""
+    """Get or create the cache manager singleton (thread-safe)."""
     global _cache
     if _cache is None:
-        _cache = CacheManager()
+        with _cache_lock:
+            # Double-checked locking
+            if _cache is None:
+                _cache = CacheManager()
     return _cache

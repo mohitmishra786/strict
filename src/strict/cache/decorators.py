@@ -13,6 +13,8 @@ import json
 import logging
 import threading
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from concurrent.futures import ThreadPoolExecutor
+import nest_asyncio
 
 from strict.storage.cache import get_cache
 
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+_thread_pool = ThreadPoolExecutor(max_workers=1)
 
 
 class CacheStats:
@@ -51,18 +54,20 @@ class CacheStats:
 
     @property
     def hit_rate(self) -> float:
-        """Calculate cache hit rate."""
-        total = self.hits + self.misses
-        return self.hits / total if total > 0 else 0.0
+        """Calculate cache hit rate with thread-safety."""
+        with self._lock:
+            total = self.hits + self.misses
+            return self.hits / total if total > 0 else 0.0
 
     def to_dict(self) -> dict[str, int | float]:
-        """Convert stats to dictionary."""
-        return {
-            "hits": self.hits,
-            "misses": self.misses,
-            "errors": self.errors,
-            "hit_rate": self.hit_rate,
-        }
+        """Convert stats to dictionary with thread-safety."""
+        with self._lock:
+            return {
+                "hits": self.hits,
+                "misses": self.misses,
+                "errors": self.errors,
+                "hit_rate": self.hit_rate,  # Compute within lock
+            }
 
 
 # Global cache stats instance
@@ -139,7 +144,7 @@ def cached(
                     cache_stats.record_hit()
                     return cached_value
 
-                # Cache miss - call the function
+                # Cache miss - record BEFORE calling function
                 logger.debug(f"Cache miss for key: {cache_key}")
                 cache_stats.record_miss()
                 result = await func(*args, **kwargs)
@@ -164,20 +169,36 @@ def cached(
 
             try:
                 # Try to get from cache (synchronous)
-                cached_value = asyncio.run(get_cache().get(cache_key))
+                # Run async cache operations in a thread to avoid event loop conflicts
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Event loop exists, run in thread pool
+                    cached_value = _thread_pool.submit(
+                        asyncio.run, get_cache().get(cache_key)
+                    ).result()
+                except RuntimeError:
+                    # No event loop, use asyncio.run directly
+                    cached_value = asyncio.run(get_cache().get(cache_key))
 
                 if cached_value is not None:
                     logger.debug(f"Cache hit for key: {cache_key}")
                     cache_stats.record_hit()
                     return cached_value
 
-                # Cache miss - call the function
+                # Cache miss - record before calling function
                 logger.debug(f"Cache miss for key: {cache_key}")
                 cache_stats.record_miss()
                 result = func(*args, **kwargs)
 
                 # Store in cache
-                asyncio.run(get_cache().set(cache_key, result, ttl))
+                try:
+                    loop = asyncio.get_running_loop()
+                    _thread_pool.submit(
+                        asyncio.run, get_cache().set(cache_key, result, ttl)
+                    ).result()
+                except RuntimeError:
+                    asyncio.run(get_cache().set(cache_key, result, ttl))
+
                 return result
 
             except Exception as e:
@@ -219,8 +240,8 @@ def cache_result(
                     cache_stats.record_hit()
                     return cached_value
 
-                result = await func(*args, **kwargs)
                 cache_stats.record_miss()
+                result = await func(*args, **kwargs)
                 await get_cache().set(cache_key, result, ttl)
                 return result
 
@@ -231,15 +252,31 @@ def cache_result(
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             try:
-                cached_value = asyncio.run(get_cache().get(cache_key))
+                # Check if event loop is running and run async cache in thread
+                try:
+                    loop = asyncio.get_running_loop()
+                    cached_value = _thread_pool.submit(
+                        asyncio.run, get_cache().get(cache_key)
+                    ).result()
+                except RuntimeError:
+                    cached_value = asyncio.run(get_cache().get(cache_key))
 
                 if cached_value is not None:
                     cache_stats.record_hit()
                     return cached_value
 
-                result = func(*args, **kwargs)
                 cache_stats.record_miss()
-                asyncio.run(get_cache().set(cache_key, result, ttl))
+                result = func(*args, **kwargs)
+
+                # Store in cache
+                try:
+                    loop = asyncio.get_running_loop()
+                    _thread_pool.submit(
+                        asyncio.run, get_cache().set(cache_key, result, ttl)
+                    ).result()
+                except RuntimeError:
+                    asyncio.run(get_cache().set(cache_key, result, ttl))
+
                 return result
 
             except Exception:
@@ -254,42 +291,5 @@ def cache_result(
     return decorator
 
 
-class CacheStats:
-    """Cache statistics tracker."""
-
-    def __init__(self) -> None:
-        """Initialize cache stats."""
-        self.hits: int = 0
-        self.misses: int = 0
-        self.errors: int = 0
-
-    def record_hit(self) -> None:
-        """Record a cache hit."""
-        self.hits += 1
-
-    def record_miss(self) -> None:
-        """Record a cache miss."""
-        self.misses += 1
-
-    def record_error(self) -> None:
-        """Record a cache error."""
-        self.errors += 1
-
-    @property
-    def hit_rate(self) -> float:
-        """Calculate cache hit rate."""
-        total = self.hits + self.misses
-        return self.hits / total if total > 0 else 0.0
-
-    def to_dict(self) -> dict[str, int | float]:
-        """Convert stats to dictionary."""
-        return {
-            "hits": self.hits,
-            "misses": self.misses,
-            "errors": self.errors,
-            "hit_rate": self.hit_rate,
-        }
-
-
-# Global cache stats instance
+# Global cache stats instance (thread-safe version created earlier in file)
 cache_stats = CacheStats()
