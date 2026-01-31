@@ -91,6 +91,14 @@ class StrictSettings(BaseSettings):
         default_factory=list,
         description="List of valid API keys for authentication",
     )
+    admin_username: str = Field(
+        default="admin",
+        description="Administrator username",
+    )
+    admin_password_hash: str = Field(
+        default="$2b$12$npx34fPjj96wXPYvVp4Eg.AkSJPSZr6clNxacAt.LiaDWAfzV518m",
+        description="Administrator password hash (bcrypt)",
+    )
     auth_algorithm: str = Field(
         default="HS256",
         description="JWT Algorithm",
@@ -209,11 +217,18 @@ def get_settings() -> StrictSettings:
         # In debug mode, provide helpful development defaults
         import os
 
-        if os.getenv("STRICT_DEBUG_MODE"):
+        if os.getenv("STRICT_DEBUG"):
             warnings.warn(
                 "Using DEBUG MODE with insecure defaults - NOT FOR PRODUCTION",
                 stacklevel=2,
             )
+            return StrictSettings(
+                debug=True,
+                auth_secret_key=SecretStr("dev-secret-key-do-not-use-in-production"),
+                database_url="",
+                redis_url="redis://localhost:6379/0",
+            )
+
             return StrictSettings(
                 debug=True,
                 auth_secret_key=SecretStr("dev-secret-key-do-not-use-in-production"),

@@ -189,7 +189,7 @@ class PluginManager:
             module = importlib.import_module(module_path)
             plugin_class = getattr(module, class_name)
 
-            if not inspect.issubclass(plugin_class, Plugin):
+            if not issubclass(plugin_class, Plugin):
                 logger.error(f"{class_name} is not a subclass of Plugin")
                 return None
 
@@ -204,7 +204,7 @@ class PluginManager:
             return None
 
     async def load_plugins_from_directory(self, directory: Path) -> list[Plugin]:
-        """Load all plugins from a directory.
+        """Load all plugins from a directory by file path.
 
         Args:
             directory: Directory containing plugin modules.
@@ -212,15 +212,22 @@ class PluginManager:
         Returns:
             List of loaded plugins.
         """
+        import importlib.util
+
         loaded = []
 
         for plugin_file in directory.glob("*_plugin.py"):
-            module_name = plugin_file.stem
+            module_name = f"plugin_{plugin_file.stem}"
 
             try:
-                module = importlib.import_module(f"{directory.stem}.{module_name}")
+                spec = importlib.util.spec_from_file_location(module_name, plugin_file)
+                if spec is None or spec.loader is None:
+                    continue
 
-                for name, obj in inspect.getmembers(module, inspect.isclass):
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                for _, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, Plugin) and obj is not Plugin:
                         plugin = obj()
                         await plugin.setup()

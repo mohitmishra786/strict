@@ -16,23 +16,15 @@ from strict.api.schemas import (
 from strict.api.security import (
     Token,
     create_access_token,
-    get_current_user,
+    get_current_user_or_apikey,
     verify_password,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     TokenData,
 )
+from strict.config import get_settings
 
 router = APIRouter()
 processor_manager = ProcessorManager()
-
-# Simple in-memory user database (in production, use a real database)
-USERS_DB = {
-    "admin": {
-        "username": "admin",
-        # Hash of "secret" - Use: get_password_hash("secret") to generate
-        "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj9SjKEq7mWq",
-    }
-}
 
 
 @router.post("/token", response_model=Token)
@@ -40,8 +32,11 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
     """Authenticate user and return access token."""
-    user = USERS_DB.get(form_data.username)
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
+    settings = get_settings()
+
+    if form_data.username != settings.admin_username or not verify_password(
+        form_data.password, settings.admin_password_hash
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -62,7 +57,8 @@ async def health_check() -> HealthResponse:
 
 @router.post("/validate/signal", response_model=ValidationResponse)
 async def validate_signal(
-    dto: SignalConfigDTO, current_user: Annotated[TokenData, Depends(get_current_user)]
+    dto: SignalConfigDTO,
+    current_user: Annotated[TokenData, Depends(get_current_user_or_apikey)],
 ) -> ValidationResponse:
     """Validate a signal configuration.
 
@@ -97,7 +93,7 @@ async def validate_signal(
 @router.post("/process/request")
 async def process_request(
     dto: ProcessingRequestDTO,
-    current_user: Annotated[TokenData, Depends(get_current_user)],
+    current_user: Annotated[TokenData, Depends(get_current_user_or_apikey)],
 ) -> dict[str, Any]:
     """Process a request with routing logic.
 

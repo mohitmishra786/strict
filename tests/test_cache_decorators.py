@@ -2,10 +2,37 @@
 
 import asyncio
 
+from unittest.mock import AsyncMock, patch
 import pytest
 
 from strict.cache import cached, cache_result, cache_stats
-from strict.storage.cache import cache
+from strict.storage.cache import get_cache
+
+
+@pytest.fixture(autouse=True)
+def reset_cache_stats():
+    """Reset global cache stats before each test."""
+    cache_stats.reset()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def mock_cache_backend():
+    """Mock the cache backend to avoid connection issues during tests."""
+    with patch("strict.cache.decorators.get_cache") as mock_get_cache:
+        mock_instance = mock_get_cache.return_value
+        # Use a simple dict-based storage for the mock
+        storage = {}
+
+        async def mock_get(key):
+            return storage.get(key)
+
+        async def mock_set(key, value, ttl=None):
+            storage[key] = value
+
+        mock_instance.get = AsyncMock(side_effect=mock_get)
+        mock_instance.set = AsyncMock(side_effect=mock_set)
+        yield mock_instance
 
 
 class TestCacheDecorators:

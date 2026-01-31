@@ -12,9 +12,11 @@ import hashlib
 import json
 import logging
 import threading
+import atexit
+import json
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 from concurrent.futures import ThreadPoolExecutor
-import nest_asyncio
+from redis.exceptions import RedisError
 
 from strict.storage.cache import get_cache
 
@@ -25,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 _thread_pool = ThreadPoolExecutor(max_workers=1)
+
+
+# Ensure thread pool is shut down cleanly on exit
+atexit.register(_thread_pool.shutdown, wait=False)
 
 
 class CacheStats:
@@ -52,6 +58,13 @@ class CacheStats:
         with self._lock:
             self.errors += 1
 
+    def reset(self) -> None:
+        """Reset all statistics (for testing)."""
+        with self._lock:
+            self.hits = 0
+            self.misses = 0
+            self.errors = 0
+
     @property
     def hit_rate(self) -> float:
         """Calculate cache hit rate with thread-safety."""
@@ -60,13 +73,17 @@ class CacheStats:
             return self.hits / total if total > 0 else 0.0
 
     def to_dict(self) -> dict[str, int | float]:
-        """Convert stats to dictionary with thread-safety."""
+        """Convert stats to dictionary with thread-safety (no deadlock)."""
         with self._lock:
+            # Compute hit_rate inline to avoid deadlock (property also acquires lock)
+            total = self.hits + self.misses
+            hit_rate_value = self.hits / total if total > 0 else 0.0
+
             return {
                 "hits": self.hits,
                 "misses": self.misses,
                 "errors": self.errors,
-                "hit_rate": self.hit_rate,  # Compute within lock
+                "hit_rate": hit_rate_value,
             }
 
 
@@ -153,7 +170,7 @@ def cached(
                 await get_cache().set(cache_key, result, ttl)
                 return result
 
-            except Exception as e:
+            except (RedisError, json.JSONDecodeError, ConnectionError) as e:
                 logger.warning(f"Cache error: {e}, falling back to function call")
                 cache_stats.record_error()
                 return await func(*args, **kwargs)
@@ -171,7 +188,7 @@ def cached(
                 # Try to get from cache (synchronous)
                 # Run async cache operations in a thread to avoid event loop conflicts
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     # Event loop exists, run in thread pool
                     cached_value = _thread_pool.submit(
                         asyncio.run, get_cache().get(cache_key)
@@ -192,7 +209,7 @@ def cached(
 
                 # Store in cache
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     _thread_pool.submit(
                         asyncio.run, get_cache().set(cache_key, result, ttl)
                     ).result()
@@ -201,7 +218,7 @@ def cached(
 
                 return result
 
-            except Exception as e:
+            except (RedisError, json.JSONDecodeError, ConnectionError) as e:
                 logger.warning(f"Cache error: {e}, falling back to function call")
                 cache_stats.record_error()
                 return func(*args, **kwargs)
@@ -245,7 +262,7 @@ def cache_result(
                 await get_cache().set(cache_key, result, ttl)
                 return result
 
-            except Exception:
+            except (RedisError, json.JSONDecodeError, ConnectionError):
                 cache_stats.record_error()
                 return await func(*args, **kwargs)
 
@@ -254,7 +271,7 @@ def cache_result(
             try:
                 # Check if event loop is running and run async cache in thread
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     cached_value = _thread_pool.submit(
                         asyncio.run, get_cache().get(cache_key)
                     ).result()
@@ -270,7 +287,7 @@ def cache_result(
 
                 # Store in cache
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     _thread_pool.submit(
                         asyncio.run, get_cache().set(cache_key, result, ttl)
                     ).result()
@@ -279,7 +296,7 @@ def cache_result(
 
                 return result
 
-            except Exception:
+            except (RedisError, json.JSONDecodeError, ConnectionError):
                 cache_stats.record_error()
                 return func(*args, **kwargs)
 
@@ -292,4 +309,4 @@ def cache_result(
 
 
 # Global cache stats instance (thread-safe version created earlier in file)
-cache_stats = CacheStats()
+# NOTE: cache_stats is instantiated at line 74, no duplicate assignment here

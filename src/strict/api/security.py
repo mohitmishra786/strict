@@ -5,7 +5,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import (
     OAuth2PasswordBearer,
     APIKeyHeader,
-    OAuth2PasswordRequestForm,
 )
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -20,7 +19,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.auth_access_token_expire_minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
-oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
@@ -55,7 +53,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(
-    token: Optional[str] = Depends(oauth2_optional_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
 ) -> Optional[TokenData]:
     """Get current user from OAuth2 token.
 
@@ -71,7 +69,7 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
+        username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
